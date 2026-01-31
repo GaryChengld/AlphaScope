@@ -81,3 +81,4 @@ tmp/
 coverage/
 .nyc_output/
 .pytest_cache/
+.github/copilot-instructions.md
