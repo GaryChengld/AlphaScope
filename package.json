@@ -1,0 +1,22 @@
+{
+  "name": "alphascope",
+  "version": "1.0.0",
+  "private": true,
+  "workspaces": [
+    "server",
+    "client"
+  ],
+  "scripts": {
+    "dev": "concurrently --names \"SERVER,CLIENT\" --prefix-colors \"cyan,magenta\" \"npm run dev:server\" \"npm run dev:client\"",
+    "dev:server": "npm run dev --workspace=server",
+    "dev:client": "npm run dev --workspace=client",
+    "build": "npm run build:server && npm run build:client",
+    "build:server": "npm run build --workspace=server",
+    "build:client": "npm run build --workspace=client"
+  },
+  "devDependencies": {
+    "caniuse-lite": "^1.0.30001787",
+    "concurrently": "^9.1.0",
+    "effect": "^3.21.0"
+  }
+}

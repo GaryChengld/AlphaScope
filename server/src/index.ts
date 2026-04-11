@@ -1,0 +1,22 @@
+import dotenv from 'dotenv';
+// dotenv must load before any other imports that read process.env
+// npm workspace scripts set cwd to server/, so dotenv finds server/.env automatically
+dotenv.config();
+
+import express from 'express';
+import { createServer } from 'http';
+import { initSocket } from './socket/index';
+import { healthRouter } from './routes/health';
+
+const app = express();
+const httpServer = createServer(app);
+
+app.use(express.json());
+app.use('/api/health', healthRouter);
+
+initSocket(httpServer);
+
+const PORT = process.env.PORT || 3001;
+httpServer.listen(PORT, () => {
+  console.log(`[server] Alpha Scope server running on http://localhost:${PORT}`);
+});

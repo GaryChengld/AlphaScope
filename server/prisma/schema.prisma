@@ -1,0 +1,28 @@
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["driverAdapters"]
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+model Watchlist {
+  id          Int      @id @default(autoincrement())
+  name        String   @unique
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  stocks      Stock[]
+}
+
+model Stock {
+  id          Int       @id @default(autoincrement())
+  ticker      String
+  exchange    String?
+  addedAt     DateTime  @default(now())
+  watchlistId Int
+  watchlist   Watchlist @relation(fields: [watchlistId], references: [id], onDelete: Cascade)
+
+  @@unique([watchlistId, ticker])
+}
