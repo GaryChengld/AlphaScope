@@ -11,6 +11,7 @@ model Watchlist {
   id          Int      @id @default(autoincrement())
   name        String   @unique
   description String?
+  position    Int      @default(0)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
   stocks      Stock[]
@@ -20,6 +21,7 @@ model Stock {
   id          Int       @id @default(autoincrement())
   ticker      String
   exchange    String?
+  position    Int       @default(0)
   addedAt     DateTime  @default(now())
   watchlistId Int
   watchlist   Watchlist @relation(fields: [watchlistId], references: [id], onDelete: Cascade)

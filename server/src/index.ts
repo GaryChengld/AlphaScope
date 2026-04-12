@@ -7,12 +7,18 @@ import express from 'express';
 import { createServer } from 'http';
 import { initSocket } from './socket/index';
 import { healthRouter } from './routes/health';
+import { watchlistsRouter } from './routes/watchlists';
+import { watchlistStocksRouter } from './routes/watchlistStocks';
+import { stockSearchRouter } from './routes/stockSearch';
 
 const app = express();
 const httpServer = createServer(app);
 
 app.use(express.json());
 app.use('/api/health', healthRouter);
+app.use('/api/watchlists', watchlistsRouter);
+app.use('/api/watchlists/:id/stocks', watchlistStocksRouter);
+app.use('/api/stocks', stockSearchRouter);
 
 initSocket(httpServer);
 
