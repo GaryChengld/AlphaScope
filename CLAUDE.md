@@ -28,6 +28,33 @@ specs/      # Architecture docs and task tracking
 
 Server and client are independently runnable while manageable from the workspace root.
 
+### Server Layer Architecture
+
+Routes are thin HTTP handlers only — they parse/validate request parameters and delegate all business logic to services.
+
+```
+server/src/
+  lib/
+    dateUtils.ts        # subDate / today / tomorrow helpers
+    prisma.ts           # Prisma client singleton
+    yf.ts               # yahoo-finance2 singleton
+  services/
+    stockService.ts     # getStockSummary, getStockCandles, getLivePrices, computeTechnicals
+    newsService.ts      # getStockNews (Finnhub)
+    stockSearchService.ts  # searchStocks
+    watchlistService.ts # watchlist + stock CRUD (listWatchlists, createWatchlist, getStocksWithPrices, addStock, …)
+  routes/               # Express routers — no business logic
+    stockDetail.ts
+    stockSearch.ts
+    watchlists.ts
+    watchlistStocks.ts
+  socket/
+    index.ts
+  index.ts
+```
+
+**Rule:** Any reusable data-fetching or computation goes in a service, not in a route handler. Routes import from services only.
+
 ## Working Conventions
 
 - **Plan first:** Always create a plan before starting implementation work.

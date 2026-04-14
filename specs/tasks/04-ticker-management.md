@@ -29,31 +29,30 @@ Run `npx prisma db push` then `npx prisma generate`.
 
 ## API Routes
 
-### New file: `server/src/routes/watchlistStocks.ts`
+### `server/src/routes/watchlistStocks.ts` *(thin handler)*
 
 | Method | Path | Action |
 |--------|------|--------|
-| `GET` | `/api/watchlists/:id/stocks` | DB tickers → batch yahoo-finance2 quotes → return merged |
-| `POST` | `/api/watchlists/:id/stocks` | Add ticker (body: `{ ticker, exchange? }`) |
-| `DELETE` | `/api/watchlists/:id/stocks/:ticker` | Remove ticker |
-| `PATCH` | `/api/watchlists/:id/stocks/reorder` | Update positions (body: `{ ids: number[] }`) |
+| `GET` | `/api/watchlists/:id/stocks` | → `getStocksWithPrices(watchlistId)` |
+| `POST` | `/api/watchlists/:id/stocks` | → `addStock(watchlistId, ticker, exchange?)` |
+| `DELETE` | `/api/watchlists/:id/stocks/:ticker` | → `removeStock(watchlistId, ticker)` |
+| `PATCH` | `/api/watchlists/:id/stocks/reorder` | → `reorderStocks(ids)` |
 
-Price enrichment (GET): fetch all tickers for the watchlist ordered by position, call `yahooFinance.quote(tickers[])`, merge price/change/changePct. Return:
-```ts
-{ id, ticker, exchange, position, price, change, changePct }[]
-```
-
-### New file: `server/src/routes/stockSearch.ts`
+### `server/src/routes/stockSearch.ts` *(thin handler)*
 
 | Method | Path | Action |
 |--------|------|--------|
-| `GET` | `/api/stocks/search?q=:query` | `yahooFinance.search(q)` → filtered results |
+| `GET` | `/api/stocks/search?q=:query` | → `searchStocks(q)` |
 
-Return shape per result:
-```ts
-{ symbol, name, type, exchange }
-```
-Filter to `quotes` with `quoteType` in `EQUITY | ETF | INDEX | CRYPTOCURRENCY`.
+### `server/src/services/watchlistService.ts`
+
+Contains all business logic: `listWatchlists`, `createWatchlist`, `renameWatchlist`, `deleteWatchlist`, `reorderWatchlists`, `getStocksWithPrices`, `addStock`, `removeStock`, `reorderStocks`.
+
+`getStocksWithPrices` calls `getLivePrices` from `stockService.ts` (shared utility).
+
+### `server/src/services/stockSearchService.ts`
+
+`searchStocks(query)` — calls `yf.search`, filters to `EQUITY | ETF | INDEX | CRYPTOCURRENCY`, returns `{ symbol, name, type, exchange }[]`.
 
 Register both routers in `server/src/index.ts`.
 
@@ -141,8 +140,10 @@ New file: `client/src/components/AddTickerModal.tsx`
 
 **Server:**
 - `server/prisma/schema.prisma` — add `position` to Stock
-- `server/src/routes/watchlistStocks.ts` — stock CRUD + price fetch *(new)*
-- `server/src/routes/stockSearch.ts` — search via yahoo-finance2 *(new)*
+- `server/src/services/watchlistService.ts` — stock CRUD + price enrichment *(new)*
+- `server/src/services/stockSearchService.ts` — search via yahoo-finance2 *(new)*
+- `server/src/routes/watchlistStocks.ts` — thin handler, delegates to watchlistService *(new)*
+- `server/src/routes/stockSearch.ts` — thin handler, delegates to stockSearchService *(new)*
 - `server/src/index.ts` — register new routes
 
 **Client:**

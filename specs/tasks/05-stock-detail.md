@@ -1,70 +1,105 @@
-# 05 — Stock Detail Page
+# 05 — Stock Detail Page ✅ COMPLETED
 
 ## Context
 
-`StockDetail.tsx` is currently a placeholder. This task implements the full page: a live summary header, a chart (TradingView embed for stock/ETF/crypto, lightweight-charts for index), a key stats panel beside the chart, fundamental + technical sections, and a latest news feed powered by the Finnhub API.
+Implements the full stock detail page: live summary header, chart, key stats panel, and tabbed sections for Fundamentals, Technicals, and News.
 
 ---
 
 ## Layout
 
 ```
-┌─ Summary header ────────────────────────────────────────────────────┐
-│  AAPL  Apple Inc.   $213.45  +2.31 (+1.09%)                        │
-│  High: 215.00  Low: 211.00  Vol: 45.2M  Cap: $3.2T                 │
-├─ Chart area (flex-1) ─────────────────┬─ Key Stats (300px) ─────────┤
-│  [1D][5D][1M][3M][1Y]                 │  Previous Close             │
-│                                        │  Open                       │
-│  TradingView widget  (stock/ETF/crypto)│  Day's Range                │
-│  lightweight-charts  (index only)      │  52 Week Range              │
-│                                        │  Volume / Avg. Volume       │
-│                                        │  Market Cap (intraday)      │
-│                                        │  Beta (5Y Monthly)          │
-│                                        │  PE Ratio (TTM)             │
-│                                        │  EPS (TTM)                  │
-│                                        │  Next Earnings Date         │
-│                                        │  Forward Dividend & Yield   │
-│                                        │  Ex-Dividend Date           │
-│                                        │  1y Target Est              │
-├─ Fundamentals ────────────────────────┴─────────────────────────────┤
-│  Revenue/Share | Gross Profits | Profit Margin | Op. Margin | ROE | ROA │
-├─ Technicals ────────────────────────────────────────────────────────┤
-│  MA5–MA200 (Above/Below) | RSI(14) | ATR(14) | MACD | BB | Stoch   │
-├─ News ──────────────────────────────────────────────────────────────┤
-│  [img] Headline (link)                     Source · Date            │
-└─────────────────────────────────────────────────────────────────────┘
+┌─ Summary header ─────────────────────────────── H/L/Vol/Cap (right) ─┐
+│  AAPL  Apple Inc.   $213.45  +2.31 (+1.09%)                           │
+├─ Chart area ──────────────────────────────────┬─ Key Stats (280px) ───┤
+│  [1H][2H][4H][1D][1W][1M]  ← timeframe        │  Previous Close       │
+│                                                │  Open / Day's Range   │
+│  TradingView widget (EQUITY / ETF / CRYPTO)    │  52 Week Range        │
+│  lightweight-charts  (INDEX only)              │  Volume / Avg Volume  │
+│    • Candlestick + Volume histogram (pane 0)   │  Market Cap / Beta    │
+│    • RSI (pane 1, 25%)                         │  PE Ratio / EPS       │
+│    • attributionLogo: false                    │  Earnings Date        │
+│    • 30s auto-refresh (preserves zoom)         │  Dividend / Ex-Date   │
+│                                                │  1y Target Est        │
+├─ Tabs: Fundamentals | Technicals | News ───────┴───────────────────────┤
+│  (tab panel scrollable; chart + header fixed)                           │
+├─ Fundamentals (4-column grid of groups) ────────────────────────────── │
+│  Valuation | Income Statement | Margins | Profitability                 │
+│  Balance Sheet | Cash Flow | Share Statistics                           │
+├─ Technicals ────────────────────────────────────────────────────────── │
+│  MA5–MA200 (Above/Below) | RSI(14) | ATR(14) | MACD | BB | Stochastic  │
+├─ News ──────────────────────────────────────────────────────────────── │
+│  Headline (link)    Source · Date Time                                  │
+│  ─────────────────────────────────────────────                          │
+└─────────────────────────────────────────────────────────────────────── ┘
 ```
 
 ---
 
-## API Routes
+## Server Architecture
 
-New file: `server/src/routes/stockDetail.ts`  
-Register in `server/src/index.ts` alongside existing `/api/stocks/search` route.
+Follows the service/route separation pattern (see CLAUDE.md).
 
-### `GET /api/stocks/:ticker/summary`
+### `server/src/services/stockService.ts`
 
-Calls in parallel via `Promise.allSettled`:
-1. `yf.quote(ticker)` — live price, change, quoteType, exchange, shortName
-2. `yf.quoteSummary(ticker, { modules: ['summaryDetail', 'defaultKeyStatistics', 'calendarEvents', 'financialData'] }, { validateResult: false })`
-3. `yf.historical(ticker, { period1: today-300days, interval: '1d' })` — for technicals
+All data-fetching and computation logic:
 
-Computes technicals server-side using `technicalindicators` package:
-- SMA(5/10/20/50/100/200), RSI(14), ATR(14), MACD(12,26,9), BollingerBands(20,2), Stochastic(14,3)
+- **`getStockSummary(ticker)`** — calls `yf.quote`, `yf.quoteSummary` (modules: `summaryDetail`, `defaultKeyStatistics`, `calendarEvents`, `financialData`), and `yf.historical` in parallel via `Promise.allSettled`. Returns fully merged flat object (all fields nullable).
+- **`getStockCandles(ticker, period)`** — fetches OHLCV candles using `yf.chart()` for intraday (60m) or `yf.historical()` for daily+; aggregates to 2H/4H if needed; uses `tomorrow()` as `period2` to include today's candle.
+- **`computeTechnicals(candles)`** — SMA(5/10/20/50/100/200), RSI(14), ATR(14), MACD(12,26,9), BollingerBands(20,2), Stochastic(14,3) via `technicalindicators` library.
+- **`getLivePrices(tickers)`** — shared utility, also used by `watchlistService`.
 
-Returns merged flat object (all fields nullable — use `??  null` throughout):
+### `server/src/services/newsService.ts`
+
+- **`getStockNews(ticker)`** — Finnhub REST API, last 7 days, top 10 articles. Key from `process.env.FINNHUB_API_KEY`; returns `[]` if missing.
+
+### `server/src/routes/stockDetail.ts` *(thin handler)*
+
+| Method | Path | Delegates to |
+|--------|------|--------------|
+| `GET` | `/api/stocks/:ticker/summary` | `getStockSummary` |
+| `GET` | `/api/stocks/:ticker/history?period=` | `getStockCandles` |
+| `GET` | `/api/stocks/:ticker/news` | `getStockNews` |
+
+### Timeframe → interval mapping
+
+| Timeframe | Yahoo interval | Lookback | Notes |
+|-----------|---------------|----------|-------|
+| 1H | 60m | 30 days | `yf.chart()` |
+| 2H | 60m | 60 days | aggregate 2 × 1H |
+| 4H | 60m | 120 days | aggregate 4 × 1H |
+| 1D | 1d | 365 days | `yf.historical()` |
+| 1W | 1wk | 5 years | `yf.historical()` |
+| 1M | 1mo | 10 years | `yf.historical()` |
+
+### Summary response shape
+
 ```ts
 {
+  // quote
   symbol, shortName, quoteType, exchange,
   price, change, changePct, high, low, volume, marketCap,
+  // summaryDetail
   previousClose, open, dayRangeLow, dayRangeHigh,
   fiftyTwoWeekLow, fiftyTwoWeekHigh, averageVolume,
   beta, dividendRate, dividendYield, exDividendDate,
-  trailingPE, trailingEps,
+  // valuation (multi-source fallback)
+  trailingPE, forwardPE, trailingEps,
+  pegRatio,        // computed: trailingPE / (earningsGrowth × 100)
+  priceToBook, priceToSales, enterpriseValue,
+  enterpriseToEbitda, enterpriseToRevenue,
+  bookValue, sharesOutstanding, floatShares,
+  heldByInsiders, heldByInstitutions, shortRatio,
+  // calendar
   earningsDate,
-  targetMeanPrice,
-  revenuePerShare, grossProfits, profitMargins, operatingMargins,
-  returnOnEquity, returnOnAssets,
+  // financialData
+  targetMeanPrice, totalRevenue, revenuePerShare, revenueGrowth,
+  grossProfits, grossMargins, ebitda, ebitdaMargins,
+  netIncomeToCommon, earningsGrowth,
+  profitMargins, operatingMargins, returnOnEquity, returnOnAssets,
+  totalCash, totalDebt, debtToEquity, currentRatio, quickRatio,
+  operatingCashflow, freeCashflow,
+  // technicals
   technicals: {
     ma5, ma10, ma20, ma50, ma100, ma200,
     rsi14, atr14,
@@ -75,75 +110,56 @@ Returns merged flat object (all fields nullable — use `??  null` throughout):
 }
 ```
 
-### `GET /api/stocks/:ticker/history?period=1d|5d|1m|3m|1y`
-
-Used only for index (lightweight-charts). Period → `yf.historical` mapping:
-
-| period | interval | days back |
-|--------|----------|-----------|
-| 1d     | 5m       | 1         |
-| 5d     | 60m      | 5         |
-| 1m     | 1d       | 30        |
-| 3m     | 1d       | 90        |
-| 1y     | 1d       | 365       |
-
-Returns `{ time, open, high, low, close, volume }[]`.
-
-### `GET /api/stocks/:ticker/news`
-
-- Calls `https://finnhub.io/api/v1/company-news?symbol=:ticker&from=:7daysAgo&to=:today&token=FINNHUB_API_KEY`
-- Key from `process.env.FINNHUB_API_KEY` (`server/.env`); returns `[]` if key missing
-- Returns top 10: `{ headline, source, url, datetime, summary, image }[]`
-
 ---
 
-## Chart Components
+## Client Components
 
-### `client/src/components/TradingViewChart.tsx` *(new)*
+### `client/src/components/TradingViewChart.tsx`
 
-For EQUITY / ETF / CRYPTOCURRENCY:
-- `useEffect` injects TradingView Advanced Chart Widget script into a container `<div>`
-- Props: `symbol: string`, `period: string`
-- Period → TradingView interval: `1d→"D"`, `5d→"W"`, `1m→"M"`, `3m→"3M"`, `1y→"12M"`
-- Cleans up (removes script + clears container) on symbol/period change
+For EQUITY / ETF / CRYPTOCURRENCY. Injects TradingView Advanced Chart Widget script.
+- `hide_side_toolbar: true`
+- `studies: ['RSI@tv-basicstudies']`
+- Period → TradingView interval: `1H→"60"`, `2H→"120"`, `4H→"240"`, `1D→"D"`, `1W→"W"`, `1M→"M"`
 
-### `client/src/components/IndexChart.tsx` *(new)*
+### `client/src/components/IndexChart.tsx`
 
-For INDEX:
-- Fetches `GET /api/stocks/:ticker/history?period=:period` on mount and period change
-- Creates `createChart()` from `lightweight-charts`, adds `CandlestickSeries`
-- `ResizeObserver` handles container resize; cleanup on unmount
+For INDEX (ticker starts with `^` or `quoteType === 'INDEX'`). Single `createChart()` instance with two panes:
+- Pane 0: `CandlestickSeries` + `HistogramSeries` (volume, `priceScaleId: 'volume'`, `scaleMargins: { top: 0.8, bottom: 0 }`)
+- Pane 1: `LineSeries` for RSI — `chart.addSeries(LineSeries, opts, 1)`
+- Pane ratio: `panes[0].setStretchFactor(3)`, `panes[1].setStretchFactor(1)`
+- `layout.attributionLogo: false`
+- 30s `setInterval` refresh; skips `fitContent()` on subsequent loads to preserve user zoom
 
 ---
 
 ## StockDetail Page
 
-`client/src/pages/StockDetail.tsx` — full rewrite:
+`client/src/pages/StockDetail.tsx`:
 
-1. `useParams<{ ticker: string }>()` to extract ticker
-2. Fetch `/summary` and `/news` in parallel on ticker change; loading/error states
-3. **Summary header** — symbol (bold, large), shortName, price (`toLocaleString` format `999,999.99`), change + changePct (green/red with ▲/▼), high/low/volume/marketCap row
-4. **Chart + Key Stats** — flex row; chart takes `flex-1`, key stats panel is `w-[300px] shrink-0`
-   - Period buttons `[1D][5D][1M][3M][1Y]` above chart; active button highlighted blue
-   - Render `<TradingViewChart>` or `<IndexChart>` based on `quoteType === 'INDEX'`
-5. **Key Stats panel** — label/value grid; `—` for nulls; format: numbers with `toLocaleString`, percentages ×100 with `%`, dates with `toLocaleDateString`
-6. **Fundamentals section** — card grid: Revenue/Share, Gross Profits, Profit Margin, Operating Margin, ROE, ROA
-7. **Technicals section** — two sub-grids:
-   - MA table: period | value | vs price signal (green "Above" / red "Below")
-   - Oscillators: RSI(14) with Overbought/Neutral/Oversold label; ATR(14); MACD with Bullish/Bearish; BB upper/mid/lower; Stochastic %K/%D with label
-8. **News section** — list of up to 10 articles: `<img>` thumbnail (40×40, fallback gray box) | headline as `<a target="_blank">` | source + formatted date
+1. `useParams<{ ticker: string }>()`
+2. Fetch `/summary` + `/news` in parallel on ticker change; `/summary` also re-fetches every 30s
+3. **Summary header** — symbol + name (left), price + change (left), H/L/Vol/Cap stacked 4 lines (right)
+4. **Chart** — `isIndex = quoteType === 'INDEX' || ticker.startsWith('^')`; fixed `height: 600`, `overflow-hidden`
+5. **Key Stats panel** — `w-[280px] shrink-0`; 14 rows; `—` for nulls
+6. **Tabs** — `fundamentals | technicals | news`; tab panel is `overflow-y-auto flex-1` (only scrollable section)
+7. **Fundamentals** — 4-column grid of `FundGroup` components (each a bordered card with green group title):
+   - Valuation, Income Statement, Margins, Profitability, Balance Sheet, Cash Flow, Share Statistics
+8. **Technicals** — two columns: Moving Averages (MA5–MA200 with Above/Below badge) + Oscillators (RSI, ATR, MACD, BB, Stochastic)
+9. **News** — `divide-y divide-gray-800` list; each item: headline link + source · date time; no thumbnails
 
 ---
 
-## Files to Create / Modify
+## Files Created / Modified
 
 **Server:**
-- `server/src/routes/stockDetail.ts` — all three endpoints + technicals computation *(new)*
-- `server/src/index.ts` — register `stockDetailRouter` under `/api/stocks`
-- `server/.env` — add `FINNHUB_API_KEY=`
+- `server/src/lib/dateUtils.ts` — `subDate`, `today`, `tomorrow` *(new)*
+- `server/src/services/stockService.ts` — summary, candles, technicals, live prices *(new)*
+- `server/src/services/newsService.ts` — Finnhub news *(new)*
+- `server/src/routes/stockDetail.ts` — thin handler *(rewritten)*
+- `server/.env` — `FINNHUB_API_KEY=`
 
 **Client:**
-- `client/src/pages/StockDetail.tsx` — full rewrite
+- `client/src/pages/StockDetail.tsx` — full implementation *(rewritten)*
 - `client/src/components/TradingViewChart.tsx` *(new)*
 - `client/src/components/IndexChart.tsx` *(new)*
 
@@ -151,11 +167,12 @@ For INDEX:
 
 ## Verification
 
-1. Click AAPL → header shows live price, change, high/low/vol/cap
-2. TradingView chart renders; period buttons switch interval
-3. Click `^GSPC` → lightweight-charts candlestick renders with history data
-4. Key stats panel shows Previous Close, PE Ratio, EPS, dividend info, etc.
-5. Fundamentals section shows revenue, margins, ROE/ROA
-6. Technicals shows MA5–MA200 signals, RSI label, ATR, MACD, BB, Stochastic
-7. All null/missing fields display `—`
-8. News section shows up to 10 articles with thumbnail, headline link, source + date
+1. Click AAPL → header shows live price, change, H/L/Vol/Cap on the right
+2. TradingView chart renders; timeframe buttons (1H–1M) switch interval; left toolbar hidden
+3. Click `^GSPC` → lightweight-charts with candles, volume histogram, RSI pane
+4. Chart height stays fixed when switching tabs
+5. Key stats panel shows all 14 rows; null fields show `—`
+6. Fundamentals tab: 7 groups in 4-column grid, green group titles, all values populated for stocks
+7. Technicals tab: MA signals, RSI label, ATR, MACD, BB, Stochastic
+8. News tab: articles separated by divider lines, source + date + time shown
+9. Summary header auto-refreshes every 30s; chart data refreshes every 30s (index only)

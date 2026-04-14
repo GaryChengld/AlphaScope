@@ -10,6 +10,7 @@ import { healthRouter } from './routes/health';
 import { watchlistsRouter } from './routes/watchlists';
 import { watchlistStocksRouter } from './routes/watchlistStocks';
 import { stockSearchRouter } from './routes/stockSearch';
+import { stockDetailRouter } from './routes/stockDetail';
 
 const app = express();
 const httpServer = createServer(app);
@@ -19,6 +20,7 @@ app.use('/api/health', healthRouter);
 app.use('/api/watchlists', watchlistsRouter);
 app.use('/api/watchlists/:id/stocks', watchlistStocksRouter);
 app.use('/api/stocks', stockSearchRouter);
+app.use('/api/stocks', stockDetailRouter);
 
 initSocket(httpServer);
 
