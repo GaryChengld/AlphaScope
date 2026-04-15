@@ -132,13 +132,36 @@ For INDEX (ticker starts with `^` or `quoteType === 'INDEX'`). Single `createCha
 
 ---
 
+## Watchlist Bookmark
+
+### `server/src/services/watchlistService.ts`
+
+- **`getWatchlistMembership(ticker)`** — queries all `Stock` rows matching the ticker, returns `number[]` of watchlist IDs.
+
+### `server/src/routes/watchlists.ts` *(added route)*
+
+| Method | Path | Delegates to |
+|--------|------|--------------|
+| `GET` | `/api/watchlists/membership?ticker=` | `getWatchlistMembership` — returns `number[]` of watchlist IDs containing the ticker |
+
+### `client/src/components/WatchlistBookmark.tsx`
+
+- Fetches membership on mount (so icon is correct immediately) and again when dropdown opens (to stay in sync).
+- Bookmark icon: filled blue if `memberOf.size > 0`, gray otherwise.
+- Clicking opens a dropdown listing all watchlists from `WatchlistContext`, each with a checkbox.
+- Toggling a checkbox: optimistic state update → `POST /api/watchlists/:id/stocks` or `DELETE /api/watchlists/:id/stocks/:ticker` → `refreshStocks()`.
+- Multiple watchlists can be checked simultaneously.
+- Closes on outside click.
+
+---
+
 ## StockDetail Page
 
 `client/src/pages/StockDetail.tsx`:
 
 1. `useParams<{ ticker: string }>()`
 2. Fetch `/summary` + `/news` in parallel on ticker change; `/summary` also re-fetches every 30s
-3. **Summary header** — symbol + name (left), price + change (left), H/L/Vol/Cap stacked 4 lines (right)
+3. **Summary header** — symbol + name + exchange + `<WatchlistBookmark>` (left), price + change (left), H/L/Vol/Cap stacked 4 lines (right)
 4. **Chart** — `isIndex = quoteType === 'INDEX' || ticker.startsWith('^')`; fixed `height: 600`, `overflow-hidden`
 5. **Key Stats panel** — `w-[280px] shrink-0`; 14 rows; `—` for nulls
 6. **Tabs** — `fundamentals | technicals | news`; tab panel is `overflow-y-auto flex-1` (only scrollable section)
@@ -162,6 +185,7 @@ For INDEX (ticker starts with `^` or `quoteType === 'INDEX'`). Single `createCha
 - `client/src/pages/StockDetail.tsx` — full implementation *(rewritten)*
 - `client/src/components/TradingViewChart.tsx` *(new)*
 - `client/src/components/IndexChart.tsx` *(new)*
+- `client/src/components/WatchlistBookmark.tsx` *(new)*
 
 ---
 
@@ -176,3 +200,4 @@ For INDEX (ticker starts with `^` or `quoteType === 'INDEX'`). Single `createCha
 7. Technicals tab: MA signals, RSI label, ATR, MACD, BB, Stochastic
 8. News tab: articles separated by divider lines, source + date + time shown
 9. Summary header auto-refreshes every 30s; chart data refreshes every 30s (index only)
+10. Bookmark icon beside symbol is filled blue on load if stock is already in any watchlist; dropdown shows all watchlists with correct checked state; toggling adds/removes from that watchlist

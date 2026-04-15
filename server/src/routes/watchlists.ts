@@ -1,13 +1,20 @@
 import { Router } from 'express';
 import {
   listWatchlists, createWatchlist, renameWatchlist,
-  deleteWatchlist, reorderWatchlists,
+  deleteWatchlist, reorderWatchlists, getWatchlistMembership,
 } from '../services/watchlistService';
 
 export const watchlistsRouter = Router();
 
 watchlistsRouter.get('/', async (_req, res) => {
   res.json(await listWatchlists());
+});
+
+// GET /api/watchlists/membership?ticker=AAPL → [1, 3] (watchlist IDs containing the ticker)
+watchlistsRouter.get('/membership', async (req, res) => {
+  const ticker = String(req.query.ticker ?? '').trim();
+  if (!ticker) { res.json([]); return; }
+  res.json(await getWatchlistMembership(ticker));
 });
 
 watchlistsRouter.post('/', async (req, res) => {

@@ -27,6 +27,16 @@ export async function reorderWatchlists(ids: number[]) {
   );
 }
 
+// ─── Membership ──────────────────────────────────────────────────────────────
+
+export async function getWatchlistMembership(ticker: string): Promise<number[]> {
+  const rows = await prisma.stock.findMany({
+    where: { ticker: ticker.toUpperCase() },
+    select: { watchlistId: true },
+  });
+  return rows.map((r) => r.watchlistId);
+}
+
 // ─── Stocks ───────────────────────────────────────────────────────────────────
 
 export async function getStocksWithPrices(watchlistId: number) {

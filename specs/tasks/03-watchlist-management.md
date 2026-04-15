@@ -37,6 +37,7 @@ New file: `server/src/routes/watchlists.ts`
 | `PATCH` | `/api/watchlists/reorder` | Update positions (body: `{ ids: number[] }`) — must be before `/:id` |
 | `PATCH` | `/api/watchlists/:id` | Rename watchlist |
 | `DELETE` | `/api/watchlists/:id` | Delete watchlist (cascades stocks via Prisma `onDelete: Cascade`) |
+| `GET` | `/api/watchlists/membership?ticker=` | Returns `number[]` of watchlist IDs that contain the ticker (used by WatchlistBookmark) |
 
 Register in `server/src/index.ts` as `app.use('/api/watchlists', watchlistsRouter)`.
 

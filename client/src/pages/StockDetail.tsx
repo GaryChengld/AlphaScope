@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import TradingViewChart from '../components/TradingViewChart';
 import IndexChart from '../components/IndexChart';
+import WatchlistBookmark from '../components/WatchlistBookmark';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -17,7 +18,10 @@ interface Technicals {
 
 interface Summary {
   symbol: string; shortName: string | null; quoteType: string | null; exchange: string | null;
+  marketState: string | null;
   price: number | null; change: number | null; changePct: number | null;
+  preMarketPrice: number | null; preMarketChange: number | null; preMarketChangePct: number | null;
+  postMarketPrice: number | null; postMarketChange: number | null; postMarketChangePct: number | null;
   high: number | null; low: number | null; volume: number | null; marketCap: number | null;
   previousClose: number | null; open: number | null;
   dayRangeLow: number | null; dayRangeHigh: number | null;
@@ -171,10 +175,11 @@ export default function StockDetail() {
           <div className="flex items-start justify-between gap-4">
             {/* Left: symbol + price + change */}
             <div>
-              <div className="flex items-baseline gap-3 flex-wrap">
+              <div className="flex items-center gap-3 flex-wrap">
                 <h1 className="text-2xl font-bold text-gray-100">{summary?.symbol ?? ticker}</h1>
                 {summary?.shortName && <span className="text-base text-gray-400">{summary.shortName}</span>}
                 {summary?.exchange && <span className="text-xs text-gray-600">{summary.exchange}</span>}
+                <WatchlistBookmark ticker={summary?.symbol ?? ticker} exchange={summary?.exchange ?? null} />
               </div>
               <div className="flex items-baseline gap-3 mt-1 flex-wrap">
                 <span className="text-3xl font-semibold text-gray-100 tabular-nums">
@@ -186,6 +191,28 @@ export default function StockDetail() {
                   </span>
                 )}
               </div>
+              {(() => {
+                const state = summary?.marketState;
+                const isPre  = state === 'PRE'  || state === 'PREPRE';
+                const isPost = state === 'POST' || state === 'POSTPOST' || state === 'CLOSED';
+                const extPrice  = isPre ? summary?.preMarketPrice  : isPost ? summary?.postMarketPrice  : null;
+                const extChange = isPre ? summary?.preMarketChange : isPost ? summary?.postMarketChange : null;
+                const extPct    = isPre ? summary?.preMarketChangePct : isPost ? summary?.postMarketChangePct : null;
+                const label     = isPre ? 'Pre-market' : 'After hours';
+                if (extPrice == null) return null;
+                const up   = (extChange ?? 0) >= 0;
+                const color = up ? 'text-green-400' : 'text-red-400';
+                const sign  = up ? '+' : '';
+                return (
+                  <div className={`flex items-baseline gap-2 mt-0.5 text-sm tabular-nums ${color}`}>
+                    <span className="text-gray-500 text-xs">{label}</span>
+                    <span className="font-medium">{fmt(extPrice)}</span>
+                    {extChange != null && (
+                      <span className="text-xs">{sign}{fmt(extChange)} ({sign}{(extPct ?? 0).toFixed(2)}%)</span>
+                    )}
+                  </div>
+                );
+              })()}
             </div>
             {/* Right: H / L / Vol / Cap */}
             <div className="flex flex-col items-end gap-0.5 text-xs shrink-0">
