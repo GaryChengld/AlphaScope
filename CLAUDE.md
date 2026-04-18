@@ -9,7 +9,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Tech Stack
 
 - **Runtime:** Node.js v20+ with TypeScript
-- **Frontend:** React 18 + Vite + Tailwind CSS + Lucide Icons + socket.io-client + react-markdown
+- **Frontend:** React 18 + Vite + Tailwind CSS + Lucide Icons + socket.io-client + react-markdown + @hello-pangea/dnd (drag-to-reorder)
 - **Backend:** Express.js + Socket.io (real-time streaming)
 - **Database:** SQLite via Prisma ORM
 - **AI:** Multi-provider LLM support — Google Gemini, OpenAI, Claude (persistent chat session, lazy-initialized)
@@ -54,6 +54,12 @@ server/src/
 ```
 
 **Rule:** Any reusable data-fetching or computation goes in a service, not in a route handler. Routes import from services only.
+
+### Sidebar Stock List Behaviour
+
+- **Column-header sorting:** Clicking Symbol / Price / Change / Chg% cycles asc → desc → normal. Active column shows a `ChevronUp`/`ChevronDown` icon. Only one column sorted at a time; clicking a different column resets the previous.
+- **Drag-to-reorder:** Only available in normal (unsorted) order. When any sort is active, grip handles are hidden (`invisible`) and `isDragDisabled` is set on every `<Draggable>`. Drag calls `PATCH /api/watchlists/:id/stocks/reorder` with an optimistic state update to avoid flicker.
+- **Sort is local state** in `Sidebar.tsx` — no server or context changes needed. It resets automatically on watchlist switch.
 
 ## Working Conventions
 

@@ -1,6 +1,6 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useMemo } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
-import { LayoutDashboard, ScanSearch, BookMarked, Check, Pencil, GripVertical, Trash2, X, Plus } from 'lucide-react';
+import { LayoutDashboard, ScanSearch, BookMarked, Check, Pencil, GripVertical, Trash2, X, Plus, ChevronUp, ChevronDown } from 'lucide-react';
 import { DragDropContext, Droppable, Draggable, type DropResult, type DraggableProvidedDragHandleProps } from '@hello-pangea/dnd';
 import { useWatchlist, type Watchlist, type StockWithPrice } from '../../context/WatchlistContext';
 import AddTickerModal from '../AddTickerModal';
@@ -251,6 +251,11 @@ function WatchlistDropdown({ onClose }: WatchlistDropdownProps) {
   );
 }
 
+// ─── Sort types ──────────────────────────────────────────────────────────────
+
+type SortKey = 'ticker' | 'price' | 'change' | 'changePct' | null;
+type SortDir = 'asc' | 'desc';
+
 // ─── Stock Row ────────────────────────────────────────────────────────────────
 
 interface StockRowProps {
@@ -258,9 +263,10 @@ interface StockRowProps {
   index: number;
   onRemove: (ticker: string) => void;
   dragHandleProps: DraggableProvidedDragHandleProps | null | undefined;
+  dragDisabled: boolean;
 }
 
-function StockRow({ stock, index, onRemove, dragHandleProps }: StockRowProps) {
+function StockRow({ stock, index, onRemove, dragHandleProps, dragDisabled }: StockRowProps) {
   const navigate = useNavigate();
   const { ticker, price, change, changePct } = stock;
   const positive = (change ?? 0) >= 0;
@@ -271,7 +277,10 @@ function StockRow({ stock, index, onRemove, dragHandleProps }: StockRowProps) {
     <div>
       {index > 0 && <div className="mx-3 border-t border-gray-800" />}
       <div className="relative group flex items-center">
-        <div {...dragHandleProps} className="pl-1 text-gray-700 hover:text-gray-500 cursor-grab shrink-0">
+        <div
+          {...(dragDisabled ? {} : dragHandleProps)}
+          className={`pl-1 shrink-0 ${dragDisabled ? 'invisible cursor-default' : 'text-gray-700 hover:text-gray-500 cursor-grab'}`}
+        >
           <GripVertical size={16} />
         </div>
         <button
@@ -310,9 +319,51 @@ export default function Sidebar() {
   const { watchlists, activeId, stocks, stocksLoading, refreshStocks, setStocks } = useWatchlist();
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
+  const [sortKey, setSortKey] = useState<SortKey>(null);
+  const [sortDir, setSortDir] = useState<SortDir>('asc');
   const selectorRef = useRef<HTMLDivElement>(null);
 
   const activeWatchlist = watchlists.find((w) => w.id === activeId);
+  const dragDisabled = sortKey !== null;
+
+  // Reset sort when switching watchlists
+  useEffect(() => {
+    setSortKey(null);
+    setSortDir('asc');
+  }, [activeId]);
+
+  const displayStocks = useMemo(() => {
+    if (!sortKey) return stocks;
+    return [...stocks].sort((a, b) => {
+      if (sortKey === 'ticker') {
+        return sortDir === 'asc'
+          ? a.ticker.localeCompare(b.ticker)
+          : b.ticker.localeCompare(a.ticker);
+      }
+      const av = a[sortKey] ?? (sortDir === 'asc' ? Infinity : -Infinity);
+      const bv = b[sortKey] ?? (sortDir === 'asc' ? Infinity : -Infinity);
+      return sortDir === 'asc' ? (av as number) - (bv as number) : (bv as number) - (av as number);
+    });
+  }, [stocks, sortKey, sortDir]);
+
+  function handleSort(key: SortKey) {
+    if (sortKey !== key) {
+      setSortKey(key);
+      setSortDir('asc');
+    } else if (sortDir === 'asc') {
+      setSortDir('desc');
+    } else {
+      setSortKey(null);
+      setSortDir('asc');
+    }
+  }
+
+  function SortIcon({ col }: { col: SortKey }) {
+    if (sortKey !== col) return null;
+    return sortDir === 'asc'
+      ? <ChevronUp size={10} className="inline ml-0.5 shrink-0" />
+      : <ChevronDown size={10} className="inline ml-0.5 shrink-0" />;
+  }
 
   useEffect(() => {
     if (!dropdownOpen) return;
@@ -397,12 +448,32 @@ export default function Sidebar() {
       <div className="mx-3 border-t border-gray-800" />
 
       {/* Column headers */}
-      <div className="flex items-center px-3 py-1.5 text-[10px] text-gray-600 uppercase tracking-wider">
+      <div className="flex items-center px-3 py-1.5 text-xs text-gray-600 uppercase tracking-wider">
         <div className="pl-1 shrink-0" style={{ width: 16 }} />
-        <span className="w-14">Symbol</span>
-        <span className="flex-1 text-right">Price</span>
-        <span className="w-20 text-right">Change</span>
-        <span className="w-14 text-right">Chg%</span>
+        <button
+          onClick={() => handleSort('ticker')}
+          className={`w-14 text-left flex items-center hover:text-gray-400 transition-colors ${sortKey === 'ticker' ? 'text-gray-300' : ''}`}
+        >
+          Symbol<SortIcon col="ticker" />
+        </button>
+        <button
+          onClick={() => handleSort('price')}
+          className={`flex-1 flex items-center justify-end hover:text-gray-400 transition-colors ${sortKey === 'price' ? 'text-gray-300' : ''}`}
+        >
+          Price<SortIcon col="price" />
+        </button>
+        <button
+          onClick={() => handleSort('change')}
+          className={`w-20 flex items-center justify-end hover:text-gray-400 transition-colors ${sortKey === 'change' ? 'text-gray-300' : ''}`}
+        >
+          Change<SortIcon col="change" />
+        </button>
+        <button
+          onClick={() => handleSort('changePct')}
+          className={`w-14 flex items-center justify-end hover:text-gray-400 transition-colors ${sortKey === 'changePct' ? 'text-gray-300' : ''}`}
+        >
+          Chg%<SortIcon col="changePct" />
+        </button>
       </div>
       <div className="mx-3 border-t border-gray-800" />
 
@@ -421,8 +492,8 @@ export default function Sidebar() {
             <Droppable droppableId="stocks">
               {(provided) => (
                 <div ref={provided.innerRef} {...provided.droppableProps}>
-                  {stocks.map((stock, i) => (
-                    <Draggable key={stock.id} draggableId={String(stock.id)} index={i}>
+                  {displayStocks.map((stock, i) => (
+                    <Draggable key={stock.id} draggableId={String(stock.id)} index={i} isDragDisabled={dragDisabled}>
                       {(provided) => (
                         <div ref={provided.innerRef} {...provided.draggableProps}>
                           <StockRow
@@ -430,6 +501,7 @@ export default function Sidebar() {
                             index={i}
                             onRemove={handleRemove}
                             dragHandleProps={provided.dragHandleProps}
+                            dragDisabled={dragDisabled}
                           />
                         </div>
                       )}
