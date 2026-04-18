@@ -28,6 +28,7 @@ interface WatchlistContextValue {
   stocks: StockWithPrice[];
   stocksLoading: boolean;
   refreshStocks: () => Promise<void>;
+  setStocks: React.Dispatch<React.SetStateAction<StockWithPrice[]>>;
 }
 
 const WatchlistContext = createContext<WatchlistContextValue | null>(null);
@@ -102,7 +103,7 @@ export function WatchlistProvider({ children }: { children: React.ReactNode }) {
   return (
     <WatchlistContext.Provider value={{
       watchlists, activeId, setActiveId, refresh,
-      stocks, stocksLoading, refreshStocks: refreshStocksBound,
+      stocks, stocksLoading, refreshStocks: refreshStocksBound, setStocks,
     }}>
       {children}
     </WatchlistContext.Provider>

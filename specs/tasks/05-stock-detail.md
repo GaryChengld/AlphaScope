@@ -79,6 +79,9 @@ All data-fetching and computation logic:
   // quote
   symbol, shortName, quoteType, exchange,
   price, change, changePct, high, low, volume, marketCap,
+  marketState,           // 'PRE' | 'PREPRE' | 'REGULAR' | 'POST' | 'POSTPOST' | 'CLOSED'
+  preMarketPrice, preMarketChange, preMarketChangePct,
+  postMarketPrice, postMarketChange, postMarketChangePct,
   // summaryDetail
   previousClose, open, dayRangeLow, dayRangeHigh,
   fiftyTwoWeekLow, fiftyTwoWeekHigh, averageVolume,
@@ -162,6 +165,7 @@ For INDEX (ticker starts with `^` or `quoteType === 'INDEX'`). Single `createCha
 1. `useParams<{ ticker: string }>()`
 2. Fetch `/summary` + `/news` in parallel on ticker change; `/summary` also re-fetches every 30s
 3. **Summary header** — symbol + name + exchange + `<WatchlistBookmark>` (left), price + change (left), H/L/Vol/Cap stacked 4 lines (right)
+   - Below regular price: extended hours row (smaller font, green/red) shown only when `marketState` is `PRE`/`PREPRE` (pre-market) or `POST`/`POSTPOST`/`CLOSED` (after hours); hidden during regular market hours or if no data
 4. **Chart** — `isIndex = quoteType === 'INDEX' || ticker.startsWith('^')`; fixed `height: 600`, `overflow-hidden`
 5. **Key Stats panel** — `w-[280px] shrink-0`; 14 rows; `—` for nulls
 6. **Tabs** — `fundamentals | technicals | news`; tab panel is `overflow-y-auto flex-1` (only scrollable section)

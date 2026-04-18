@@ -67,6 +67,8 @@ Each watchlist row has hover-revealed action icons:
 - **⠿ Drag handle** — HTML5 Drag and Drop API; on drop call `PATCH /api/watchlists/reorder`
 - **🗑 Delete** — inline confirmation in the row before deleting (no modal)
 
+> **Note:** The watchlist dropdown still uses HTML5 drag-and-drop. Only the stock list (task 04) uses `@hello-pangea/dnd`.
+
 **Active watchlist** cannot be deleted (trash icon disabled/grayed).
 
 ---

@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { LayoutDashboard, ScanSearch, BookMarked, Check, Pencil, GripVertical, Trash2, X, Plus } from 'lucide-react';
+import { DragDropContext, Droppable, Draggable, type DropResult, type DraggableProvidedDragHandleProps } from '@hello-pangea/dnd';
 import { useWatchlist, type Watchlist, type StockWithPrice } from '../../context/WatchlistContext';
 import AddTickerModal from '../AddTickerModal';
 
@@ -256,14 +257,10 @@ interface StockRowProps {
   stock: StockWithPrice;
   index: number;
   onRemove: (ticker: string) => void;
-  onDragStart: (id: number) => void;
-  onDragOver: (e: React.DragEvent, id: number) => void;
-  onDragLeave: () => void;
-  onDrop: (id: number) => void;
-  isDragTarget: boolean;
+  dragHandleProps: DraggableProvidedDragHandleProps | null | undefined;
 }
 
-function StockRow({ stock, index, onRemove, onDragStart, onDragOver, onDragLeave, onDrop, isDragTarget }: StockRowProps) {
+function StockRow({ stock, index, onRemove, dragHandleProps }: StockRowProps) {
   const navigate = useNavigate();
   const { ticker, price, change, changePct } = stock;
   const positive = (change ?? 0) >= 0;
@@ -271,19 +268,15 @@ function StockRow({ stock, index, onRemove, onDragStart, onDragOver, onDragLeave
   const sign = positive ? '+' : '';
 
   return (
-    <div
-      draggable
-      onDragStart={() => onDragStart(stock.id)}
-      onDragOver={(e) => onDragOver(e, stock.id)}
-      onDragLeave={onDragLeave}
-      onDrop={() => onDrop(stock.id)}
-      className={isDragTarget ? 'bg-blue-500/10' : ''}
-    >
+    <div>
       {index > 0 && <div className="mx-3 border-t border-gray-800" />}
-      <div className="relative group">
+      <div className="relative group flex items-center">
+        <div {...dragHandleProps} className="pl-1 text-gray-700 hover:text-gray-500 cursor-grab shrink-0">
+          <GripVertical size={16} />
+        </div>
         <button
           onClick={() => navigate(`/stock/${ticker}`)}
-          className="w-full flex items-center px-3 py-2 hover:bg-gray-800 transition-colors"
+          className="flex-1 flex items-center px-2 py-2 hover:bg-gray-800 transition-colors min-w-0"
         >
           <span className="w-14 text-sm font-semibold text-gray-100 group-hover:text-white text-left">
             {ticker}
@@ -314,11 +307,9 @@ function StockRow({ stock, index, onRemove, onDragStart, onDragOver, onDragLeave
 // ─── Sidebar ─────────────────────────────────────────────────────────────────
 
 export default function Sidebar() {
-  const { watchlists, activeId, stocks, stocksLoading, refreshStocks } = useWatchlist();
+  const { watchlists, activeId, stocks, stocksLoading, refreshStocks, setStocks } = useWatchlist();
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
-  const [dragOverId, setDragOverId] = useState<number | null>(null);
-  const dragIdRef = useRef<number | null>(null);
   const selectorRef = useRef<HTMLDivElement>(null);
 
   const activeWatchlist = watchlists.find((w) => w.id === activeId);
@@ -340,19 +331,18 @@ export default function Sidebar() {
     refreshStocks();
   }
 
-  function handleDragStart(id: number) { dragIdRef.current = id; }
-  function handleDragOver(e: React.DragEvent, id: number) { e.preventDefault(); setDragOverId(id); }
-  function handleDragLeave() { setDragOverId(null); }
+  async function handleDragEnd(result: DropResult) {
+    if (!result.destination || !activeId) return;
+    const { source, destination } = result;
+    if (source.index === destination.index) return;
 
-  async function handleDrop(targetId: number) {
-    setDragOverId(null);
-    const sourceId = dragIdRef.current;
-    if (!activeId || sourceId === null || sourceId === targetId) return;
-    const ids = stocks.map((s) => s.id);
-    const fromIdx = ids.indexOf(sourceId);
-    const toIdx = ids.indexOf(targetId);
-    ids.splice(fromIdx, 1);
-    ids.splice(toIdx, 0, sourceId);
+    // Optimistic update — reorder immediately so there's no visual flicker
+    const reordered = [...stocks];
+    const [moved] = reordered.splice(source.index, 1);
+    reordered.splice(destination.index, 0, moved);
+    setStocks(reordered);
+
+    const ids = reordered.map((s) => s.id);
     await fetch(`/api/watchlists/${activeId}/stocks/reorder`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
@@ -408,6 +398,7 @@ export default function Sidebar() {
 
       {/* Column headers */}
       <div className="flex items-center px-3 py-1.5 text-[10px] text-gray-600 uppercase tracking-wider">
+        <div className="pl-1 shrink-0" style={{ width: 16 }} />
         <span className="w-14">Symbol</span>
         <span className="flex-1 text-right">Price</span>
         <span className="w-20 text-right">Change</span>
@@ -418,7 +409,6 @@ export default function Sidebar() {
       {/* Ticker list */}
       <div className="flex-1 overflow-y-auto pb-2">
         {stocksLoading ? (
-          // Skeleton rows
           [0, 1, 2].map((i) => (
             <div key={i} className="flex items-center px-3 py-3 gap-3">
               <div className="w-10 h-3 bg-gray-800 rounded animate-pulse" />
@@ -427,21 +417,30 @@ export default function Sidebar() {
             </div>
           ))
         ) : (
-          stocks.map((stock, i) => (
-            <StockRow
-              key={stock.id}
-              stock={stock}
-              index={i}
-              onRemove={handleRemove}
-              onDragStart={handleDragStart}
-              onDragOver={handleDragOver}
-              onDragLeave={handleDragLeave}
-              onDrop={handleDrop}
-              isDragTarget={dragOverId === stock.id}
-            />
-          ))
+          <DragDropContext onDragEnd={handleDragEnd}>
+            <Droppable droppableId="stocks">
+              {(provided) => (
+                <div ref={provided.innerRef} {...provided.droppableProps}>
+                  {stocks.map((stock, i) => (
+                    <Draggable key={stock.id} draggableId={String(stock.id)} index={i}>
+                      {(provided) => (
+                        <div ref={provided.innerRef} {...provided.draggableProps}>
+                          <StockRow
+                            stock={stock}
+                            index={i}
+                            onRemove={handleRemove}
+                            dragHandleProps={provided.dragHandleProps}
+                          />
+                        </div>
+                      )}
+                    </Draggable>
+                  ))}
+                  {provided.placeholder}
+                </div>
+              )}
+            </Droppable>
+          </DragDropContext>
         )}
-
       </div>
 
       {modalOpen && <AddTickerModal onClose={() => setModalOpen(false)} />}

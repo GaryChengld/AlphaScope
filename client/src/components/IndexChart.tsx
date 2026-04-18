@@ -1,9 +1,9 @@
 import { useEffect, useRef } from 'react';
-import { createChart, ColorType, CandlestickSeries, HistogramSeries, LineSeries } from 'lightweight-charts';
+import { createChart, ColorType, CandlestickSeries, HistogramSeries, LineSeries, type UTCTimestamp } from 'lightweight-charts';
 import { RSI } from 'technicalindicators';
 
 interface Candle {
-  time: string | number;
+  time: UTCTimestamp | string;
   open: number;
   high: number;
   low: number;

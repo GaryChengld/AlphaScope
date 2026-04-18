@@ -95,9 +95,12 @@ Replace `PLACEHOLDER_STOCKS` with `stocks` from context.
 
 **Loading state:** while `stocksLoading`, show 3 skeleton rows (gray animated bars).
 
-**Drag-to-reorder** (HTML5 DnD, same pattern as watchlist dropdown):
-- `draggable` + `onDragStart/DragOver/Drop` on each stock row
-- On drop: `PATCH /api/watchlists/:id/stocks/reorder` → `refreshStocks()`
+**Drag-to-reorder** (`@hello-pangea/dnd`):
+- Wrap stock list with `<DragDropContext onDragEnd>` + `<Droppable droppableId="stocks">` + `<Draggable>` per row
+- `GripVertical` icon (size 16) bound to `provided.dragHandleProps`; row `<div>` uses `provided.draggableProps` + `provided.innerRef`
+- `onDragEnd`: **optimistically reorder** `stocks` state immediately via `setStocks(reordered)` to avoid visual flicker, then `PATCH /api/watchlists/:id/stocks/reorder` → `refreshStocks()` to sync with server
+- `WatchlistContext` exposes `setStocks` to allow optimistic updates from Sidebar
+- Column header row includes a spacer matching the grip handle width so "SYMBOL" aligns with ticker text
 
 **Remove on hover:**
 - Each stock row is `relative group`
@@ -147,9 +150,10 @@ New file: `client/src/components/AddTickerModal.tsx`
 - `server/src/index.ts` — register new routes
 
 **Client:**
-- `client/src/context/WatchlistContext.tsx` — add stocks state + 30s refresh
-- `client/src/components/layout/Sidebar.tsx` — real data, DnD, hover trash, open modal
+- `client/src/context/WatchlistContext.tsx` — add stocks state + 30s refresh + `setStocks` for optimistic DnD updates
+- `client/src/components/layout/Sidebar.tsx` — real data, DnD via `@hello-pangea/dnd`, hover trash, open modal
 - `client/src/components/AddTickerModal.tsx` — search modal *(new)*
+- `@hello-pangea/dnd` — added to `client/package.json`
 
 ---
 
