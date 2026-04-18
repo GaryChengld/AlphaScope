@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { useNavigate, NavLink } from 'react-router-dom';
+import { useNavigate, NavLink, Link } from 'react-router-dom';
 import { Search, Bell, Settings } from 'lucide-react';
 
 interface TopbarProps {
@@ -66,11 +66,11 @@ export default function Topbar({ onBellClick }: TopbarProps) {
   }
 
   return (
-    <header className="h-12 flex items-center gap-4 px-4 border-b border-gray-800 bg-gray-950 shrink-0">
+    <header className="h-16 flex items-center gap-4 px-4 border-b border-gray-800 bg-gray-800 shrink-0">
       {/* Logo */}
-      <span className="text-blue-400 font-semibold text-[17.5px] whitespace-nowrap select-none">
+      <Link to="/overview" className="text-blue-400 font-semibold text-[17.5px] whitespace-nowrap hover:text-blue-300 transition-colors">
         Alpha Scope
-      </span>
+      </Link>
 
       {/* Search — left of title, expands on focus */}
       <div className={`relative transition-all duration-200 ${focused ? 'w-[432px]' : 'w-60'}`}>

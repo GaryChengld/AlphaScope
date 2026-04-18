@@ -1,15 +1,9 @@
 import { useState, useRef, useEffect, useMemo } from 'react';
-import { NavLink, useNavigate } from 'react-router-dom';
-import { LayoutDashboard, ScanSearch, BookMarked, Check, Pencil, GripVertical, Trash2, X, Plus, ChevronUp, ChevronDown } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { BookMarked, Check, Pencil, GripVertical, Trash2, X, Plus, ChevronUp, ChevronDown } from 'lucide-react';
 import { DragDropContext, Droppable, Draggable, type DropResult, type DraggableProvidedDragHandleProps } from '@hello-pangea/dnd';
 import { useWatchlist, type Watchlist, type StockWithPrice } from '../../context/WatchlistContext';
 import AddTickerModal from '../AddTickerModal';
-
-const NAV_ITEMS = [
-  { to: '/overview', icon: LayoutDashboard, label: 'Overview' },
-  { to: '/scanner', icon: ScanSearch, label: 'Scanner' },
-];
-
 
 // ─── Watchlist Dropdown ───────────────────────────────────────────────────────
 
@@ -404,28 +398,6 @@ export default function Sidebar() {
 
   return (
     <aside className="w-[300px] shrink-0 flex flex-col border-r border-gray-800 bg-gray-950">
-      {/* Nav */}
-      <nav className="flex flex-col gap-0.5 p-2">
-        {NAV_ITEMS.map(({ to, icon: Icon, label }) => (
-          <NavLink
-            key={to}
-            to={to}
-            className={({ isActive }) =>
-              `flex items-center gap-2.5 px-3 py-2 rounded text-sm transition-colors
-              ${isActive
-                ? 'border-l-2 border-blue-400 bg-blue-500/10 text-blue-400 pl-[10px]'
-                : 'border-l-2 border-transparent text-gray-400 hover:text-gray-100 hover:bg-gray-800'
-              }`
-            }
-          >
-            <Icon size={15} />
-            {label}
-          </NavLink>
-        ))}
-      </nav>
-
-      <div className="mx-3 my-1 border-t border-gray-800" />
-
       {/* Watchlist selector */}
       <div ref={selectorRef} className="relative flex items-center px-3 py-2">
         <button
