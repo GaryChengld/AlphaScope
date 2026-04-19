@@ -69,6 +69,12 @@ aider.log
 .DS_Store
 Thumbs.db
 
+# Database
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+
 # Build outputs
 dist/
 build/
