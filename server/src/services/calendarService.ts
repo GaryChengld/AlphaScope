@@ -14,7 +14,10 @@ export interface EconomicEvent {
 
 export async function getEconomicEvents(from: string, to: string): Promise<EconomicEvent[]> {
   const apiKey = process.env.FINNHUB_API_KEY;
-  if (!apiKey) return [];
+  if (!apiKey) {
+    console.warn('[calendarService] FINNHUB_API_KEY not set');
+    return [];
+  }
 
   try {
     const url = `https://finnhub.io/api/v1/calendar/economic?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}&token=${apiKey}`;
