@@ -284,7 +284,7 @@ function EconomicTable({ events }: { events: EconomicEvent[] | null }) {
       </thead>
       <tbody>
         {events.map((ev, i) => (
-          <tr key={i} className={`border-b border-gray-800 ${i % 2 === 0 ? 'bg-gray-900/50' : ''}`}>
+          <tr key={`${ev.time}-${ev.event}`} className={`border-b border-gray-800 ${i % 2 === 0 ? 'bg-gray-900/50' : ''}`}>
             <td className="text-xs text-gray-300 py-1.5 pr-3 whitespace-nowrap">{formatEconomicTime(ev.time)}</td>
             <td className="text-xs text-gray-300 py-1.5 pr-3">{ev.event}</td>
             <td className="text-xs text-gray-300 py-1.5 pr-3 text-right tabular-nums">{formatWithUnit(ev.actual, ev.unit)}</td>
@@ -335,7 +335,7 @@ function EarningsTable({ events }: { events: EarningsEvent[] | null }) {
               : 'text-red-400';
 
           return (
-            <tr key={i} className={`border-b border-gray-800 ${i % 2 === 0 ? 'bg-gray-900/50' : ''}`}>
+            <tr key={`${ev.date}-${ev.ticker}`} className={`border-b border-gray-800 ${i % 2 === 0 ? 'bg-gray-900/50' : ''}`}>
               <td className="text-xs text-gray-300 py-1.5 pr-3 whitespace-nowrap">{ev.date}</td>
               <td className="text-xs text-gray-300 py-1.5 pr-3 font-medium">{ev.ticker}</td>
               <td className="text-xs text-gray-300 py-1.5 pr-3 truncate max-w-[120px]">{ev.shortName ?? '—'}</td>
