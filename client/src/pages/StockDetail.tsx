@@ -80,7 +80,7 @@ const fmtDate = (v: string | number | null) => {
   return isNaN(d.getTime()) ? '—' : d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 };
 
-const PERIODS = ['1H', '2H', '4H', '1D', '1W', '1M'] as const;
+const PERIODS = ['15m', '30m', '1H', '2H', '4H', '1D', '1W', '1M'] as const;
 type Period = typeof PERIODS[number];
 
 // ─── Sub-components ───────────────────────────────────────────────────────────

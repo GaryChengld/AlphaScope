@@ -20,6 +20,8 @@ interface PeriodCfg {
 }
 
 export const PERIOD_CONFIG: Record<string, PeriodCfg> = {
+  '15m': { interval: '15m', days: 7                 },
+  '30m': { interval: '30m', days: 30                },
   '1H':  { interval: '60m', days: 30,   aggregate: 1 },
   '2H':  { interval: '60m', days: 60,   aggregate: 2 },
   '4H':  { interval: '60m', days: 120,  aggregate: 4 },
@@ -213,7 +215,7 @@ export async function getStockSummary(ticker: string): Promise<Record<string, an
 
 export async function getStockCandles(ticker: string, period: string): Promise<OhlcvRow[]> {
   const cfg = PERIOD_CONFIG[period] ?? PERIOD_CONFIG['1D'];
-  const isIntraday = cfg.interval === '60m';
+  const isIntraday = cfg.interval.endsWith('m');
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let rows: any[];

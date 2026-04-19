@@ -1,6 +1,8 @@
 import { useEffect, useRef } from 'react';
 
 const PERIOD_TO_INTERVAL: Record<string, string> = {
+  '15m': '15',
+  '30m': '30',
   '1H':  '60',
   '2H':  '120',
   '4H':  '240',
