@@ -31,10 +31,10 @@ Implement the Overview page with a live market indicators bar, an interactive in
 | Dow Jones    | ^DJI       |                              |
 | VIX          | ^VIX       | volatility — no volume       |
 | US Dollar    | DX-Y.NYB   | DXY index                    |
-| 10Y Yield    | ^TNX       | client divides by 10 + shows `%` |
+| 10Y Yield    | ^TNX       | client shows raw value + `%` (Yahoo returns actual % e.g. 4.25) |
 | Crude Oil    | CL=F       | WTI front-month futures      |
 
-> **Note on ^TNX:** Yahoo Finance returns the 10-year yield multiplied by 10 (e.g. 43.5 = 4.35%). The backend returns raw values in the standard `{ price, change, changePct }` format — no special handling. The client's `MarketIndicatorBar` divides `^TNX` price by 10 and appends `%` for display only.
+> **Note on ^TNX:** Yahoo Finance returns the 10-year yield as the actual percentage value (e.g. 4.25 = 4.25%). The client appends `%` with no division needed.
 
 ---
 

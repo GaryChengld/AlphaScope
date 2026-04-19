@@ -45,19 +45,16 @@ function MarketIndicatorBar({
 }) {
   if (indicators.length === 0) {
     return (
-      <div className="flex gap-2 overflow-x-auto pb-1">
+      <div className="grid grid-cols-8 gap-2">
         {Array.from({ length: 8 }).map((_, i) => (
-          <div
-            key={i}
-            className="flex-shrink-0 w-28 h-14 rounded-lg border border-gray-700 bg-gray-800 animate-pulse"
-          />
+          <div key={i} className="h-16 rounded-lg border border-gray-700 bg-gray-800 animate-pulse" />
         ))}
       </div>
     );
   }
 
   return (
-    <div className="flex gap-2 overflow-x-auto pb-1">
+    <div className="grid grid-cols-8 gap-2">
       {indicators.map((ind) => {
         const isActive = ind.ticker === selected;
         const pct = ind.changePct;
@@ -65,7 +62,7 @@ function MarketIndicatorBar({
 
         let priceDisplay: string;
         if (ind.ticker === '^TNX') {
-          priceDisplay = ind.price !== null ? `${(ind.price / 10).toFixed(2)}%` : '—';
+          priceDisplay = ind.price !== null ? `${ind.price.toFixed(2)}%` : '—';
         } else {
           priceDisplay = ind.price !== null ? ind.price.toLocaleString(undefined, { maximumFractionDigits: 2 }) : '—';
         }
@@ -74,18 +71,18 @@ function MarketIndicatorBar({
           <button
             key={ind.ticker}
             onClick={() => onSelect(ind.ticker)}
-            className={`flex-shrink-0 flex flex-col px-3 py-2 rounded-lg border transition-colors text-left min-w-[6.5rem] ${
+            className={`flex flex-col px-4 py-3 rounded-lg border transition-colors text-left w-full ${
               isActive
                 ? 'border-blue-500/50 bg-blue-500/10 text-blue-400'
                 : 'border-gray-700 bg-gray-900 hover:border-gray-600'
             }`}
           >
             <span className="text-xs text-gray-400 leading-tight">{ind.label}</span>
-            <span className="text-sm font-semibold tabular-nums text-gray-100 leading-tight mt-0.5">
+            <span className="text-base font-semibold tabular-nums text-gray-100 leading-tight mt-1">
               {priceDisplay}
             </span>
             <span
-              className={`text-xs tabular-nums leading-tight ${
+              className={`text-xs tabular-nums leading-tight mt-0.5 ${
                 pct === null ? 'text-gray-500' : isPositive ? 'text-green-400' : 'text-red-400'
               }`}
             >
@@ -98,27 +95,30 @@ function MarketIndicatorBar({
   );
 }
 
-function SectorHeatmap({ sectors }: { sectors: SectorPrice[] }) {
+function SectorHeatmap({ sectors, selected, onSelect }: { sectors: SectorPrice[]; selected: string; onSelect: (ticker: string) => void }) {
   return (
     <div className="flex flex-col gap-2">
       <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Sectors</span>
       {sectors.length === 0 ? (
         <div className="grid grid-cols-3 gap-1.5">
           {Array.from({ length: 11 }).map((_, i) => (
-            <div key={i} className="h-14 rounded bg-gray-800 animate-pulse" />
+            <div key={i} className="h-16 rounded bg-gray-800 animate-pulse" />
           ))}
         </div>
       ) : (
         <div className="grid grid-cols-3 gap-1.5">
           {sectors.map((s) => (
-            <div
+            <button
               key={s.ticker}
-              className={`flex flex-col justify-between p-1.5 rounded ${sectorTileClass(s.changePct)}`}
+              onClick={() => onSelect(s.ticker)}
+              className={`flex flex-col justify-between p-2.5 rounded text-left w-full transition-all ${sectorTileClass(s.changePct)} ${
+                selected === s.ticker ? 'ring-2 ring-blue-400' : 'hover:brightness-125'
+              }`}
             >
-              <span className="text-xs font-bold text-white leading-tight">{s.ticker}</span>
-              <span className="text-[10px] text-gray-300 truncate leading-tight">{s.name}</span>
+              <span className="text-sm font-bold text-white leading-tight">{s.ticker}</span>
+              <span className="text-xs text-gray-300 truncate leading-tight">{s.name}</span>
               <span
-                className={`text-xs tabular-nums font-medium leading-tight ${
+                className={`text-sm tabular-nums font-medium leading-tight ${
                   s.changePct === null
                     ? 'text-gray-400'
                     : s.changePct >= 0
@@ -128,7 +128,7 @@ function SectorHeatmap({ sectors }: { sectors: SectorPrice[] }) {
               >
                 {formatChangePct(s.changePct)}
               </span>
-            </div>
+            </button>
           ))}
         </div>
       )}
@@ -167,11 +167,17 @@ export default function Overview() {
   }, []);
 
   return (
-    <div className="flex flex-col h-full overflow-hidden p-4 gap-4">
+    <div className="flex flex-col h-full overflow-y-auto p-4 gap-4">
       <MarketIndicatorBar indicators={indicators} selected={selected} onSelect={setSelected} />
+      <div className="-mx-4 border-b border-gray-800" />
 
-      <div className="flex flex-1 min-h-0 gap-4">
-        <div className="flex flex-col flex-1 min-w-0 gap-2">
+      <div className="flex gap-4">
+        <div className="flex flex-col w-[64%] min-w-0 gap-2">
+          <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider">
+            {indicators.find((i) => i.ticker === selected)?.label ??
+              sectors.find((s) => s.ticker === selected)?.name ??
+              selected}
+          </span>
           <div className="flex gap-1">
             {PERIODS.map((p) => (
               <button
@@ -187,13 +193,13 @@ export default function Overview() {
               </button>
             ))}
           </div>
-          <div className="flex-1 min-h-0">
+          <div className="h-[346px]">
             <IndexChart ticker={selected} period={period} />
           </div>
         </div>
 
-        <div className="w-72 shrink-0 overflow-y-auto">
-          <SectorHeatmap sectors={sectors} />
+        <div className="w-[36%]">
+          <SectorHeatmap sectors={sectors} selected={selected} onSelect={setSelected} />
         </div>
       </div>
     </div>

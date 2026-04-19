@@ -9,7 +9,13 @@
       "Bash(node:*)",
       "Bash(git add *)",
       "Bash(git commit -m ' *)",
-      "Bash(git commit *)"
+      "Bash(git commit *)",
+      "Bash(git worktree *)",
+      "Bash(git check-ignore *)",
+      "Bash(cat server/.gitignore)",
+      "Bash(cat server/src/.gitignore)",
+      "Bash(grep -n \"className=.*\\\\${\" client/src/pages/Overview.tsx)",
+      "Bash(git branch *)"
     ]
   }
 }
