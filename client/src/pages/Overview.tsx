@@ -80,7 +80,7 @@ function formatWeekRange(monday: Date): string {
 }
 
 function formatEconomicTime(time: string): string {
-  const date = new Date(time.replace(' ', 'T'));
+  const date = new Date(time.replace(' ', 'T') + 'Z');
   return date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }) +
     ', ' +
     date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false });
@@ -274,22 +274,22 @@ function EconomicTable({ events }: { events: EconomicEvent[] | null }) {
   return (
     <table className="w-full border-collapse">
       <thead>
-        <tr>
-          <th className="text-xs font-semibold text-gray-400 uppercase tracking-wider text-left py-1 pr-3">Date/Time</th>
-          <th className="text-xs font-semibold text-gray-400 uppercase tracking-wider text-left py-1 pr-3">Activity</th>
-          <th className="text-xs font-semibold text-gray-400 uppercase tracking-wider text-right py-1 pr-3">Actual</th>
-          <th className="text-xs font-semibold text-gray-400 uppercase tracking-wider text-right py-1 pr-3">Forecast</th>
-          <th className="text-xs font-semibold text-gray-400 uppercase tracking-wider text-right py-1">Prior</th>
+        <tr className="bg-blue-950/60">
+          <th className="text-xs font-semibold text-blue-300 uppercase tracking-wider text-left py-1.5 pl-3 pr-3">Date/Time</th>
+          <th className="text-xs font-semibold text-blue-300 uppercase tracking-wider text-left py-1.5 pr-3">Activity</th>
+          <th className="text-xs font-semibold text-blue-300 uppercase tracking-wider text-right py-1.5 pr-3">Actual</th>
+          <th className="text-xs font-semibold text-blue-300 uppercase tracking-wider text-right py-1.5 pr-3">Forecast</th>
+          <th className="text-xs font-semibold text-blue-300 uppercase tracking-wider text-right py-1.5 pr-3">Prior</th>
         </tr>
       </thead>
       <tbody>
         {events.map((ev, i) => (
           <tr key={`${ev.time}-${ev.event}`} className={`border-b border-gray-800 ${i % 2 === 0 ? 'bg-gray-900/50' : ''}`}>
-            <td className="text-xs text-gray-300 py-1.5 pr-3 whitespace-nowrap">{formatEconomicTime(ev.time)}</td>
+            <td className="text-xs text-gray-300 py-1.5 pl-3 pr-3 whitespace-nowrap">{formatEconomicTime(ev.time)}</td>
             <td className="text-xs text-gray-300 py-1.5 pr-3">{ev.event}</td>
             <td className="text-xs text-gray-300 py-1.5 pr-3 text-right tabular-nums">{formatWithUnit(ev.actual, ev.unit)}</td>
             <td className="text-xs text-gray-300 py-1.5 pr-3 text-right tabular-nums">{formatWithUnit(ev.estimate, ev.unit)}</td>
-            <td className="text-xs text-gray-300 py-1.5 text-right tabular-nums">{formatWithUnit(ev.prev, ev.unit)}</td>
+            <td className="text-xs text-gray-300 py-1.5 pr-3 text-right tabular-nums">{formatWithUnit(ev.prev, ev.unit)}</td>
           </tr>
         ))}
       </tbody>
@@ -315,14 +315,14 @@ function EarningsTable({ events }: { events: EarningsEvent[] | null }) {
   return (
     <table className="w-full border-collapse">
       <thead>
-        <tr>
-          <th className="text-xs font-semibold text-gray-400 uppercase tracking-wider text-left py-1 pr-3">Date</th>
-          <th className="text-xs font-semibold text-gray-400 uppercase tracking-wider text-left py-1 pr-3">Symbol</th>
-          <th className="text-xs font-semibold text-gray-400 uppercase tracking-wider text-left py-1 pr-3">Company</th>
-          <th className="text-xs font-semibold text-gray-400 uppercase tracking-wider text-right py-1 pr-3">Est EPS</th>
-          <th className="text-xs font-semibold text-gray-400 uppercase tracking-wider text-right py-1 pr-3">Act EPS</th>
-          <th className="text-xs font-semibold text-gray-400 uppercase tracking-wider text-right py-1 pr-3">Est Rev</th>
-          <th className="text-xs font-semibold text-gray-400 uppercase tracking-wider text-right py-1">Act Rev</th>
+        <tr className="bg-blue-950/60">
+          <th className="text-xs font-semibold text-blue-300 uppercase tracking-wider text-left py-1.5 pl-3 pr-3">Date</th>
+          <th className="text-xs font-semibold text-blue-300 uppercase tracking-wider text-left py-1.5 pr-3">Symbol</th>
+          <th className="text-xs font-semibold text-blue-300 uppercase tracking-wider text-left py-1.5 pr-3">Company</th>
+          <th className="text-xs font-semibold text-blue-300 uppercase tracking-wider text-right py-1.5 pr-3">Est EPS</th>
+          <th className="text-xs font-semibold text-blue-300 uppercase tracking-wider text-right py-1.5 pr-3">Act EPS</th>
+          <th className="text-xs font-semibold text-blue-300 uppercase tracking-wider text-right py-1.5 pr-3">Est Rev</th>
+          <th className="text-xs font-semibold text-blue-300 uppercase tracking-wider text-right py-1.5 pr-3">Act Rev</th>
         </tr>
       </thead>
       <tbody>
@@ -336,7 +336,7 @@ function EarningsTable({ events }: { events: EarningsEvent[] | null }) {
 
           return (
             <tr key={`${ev.date}-${ev.ticker}`} className={`border-b border-gray-800 ${i % 2 === 0 ? 'bg-gray-900/50' : ''}`}>
-              <td className="text-xs text-gray-300 py-1.5 pr-3 whitespace-nowrap">{ev.date}</td>
+              <td className="text-xs text-gray-300 py-1.5 pl-3 pr-3 whitespace-nowrap">{ev.date}</td>
               <td className="text-xs text-gray-300 py-1.5 pr-3 font-medium">{ev.ticker}</td>
               <td className="text-xs text-gray-300 py-1.5 pr-3 truncate max-w-[120px]">{ev.shortName ?? '—'}</td>
               <td className="text-xs text-gray-300 py-1.5 pr-3 text-right tabular-nums">
@@ -346,7 +346,7 @@ function EarningsTable({ events }: { events: EarningsEvent[] | null }) {
                 {ev.epsActual !== null ? ev.epsActual.toFixed(2) : '—'}
               </td>
               <td className="text-xs text-gray-300 py-1.5 pr-3 text-right tabular-nums">{formatRevenue(ev.revenueEstimate)}</td>
-              <td className="text-xs text-gray-300 py-1.5 text-right tabular-nums">{formatRevenue(ev.revenueActual)}</td>
+              <td className="text-xs text-gray-300 py-1.5 pr-3 text-right tabular-nums">{formatRevenue(ev.revenueActual)}</td>
             </tr>
           );
         })}
@@ -451,13 +451,13 @@ export default function Overview() {
           onDatePick={(date) => setWeekStart(mondayOf(date))}
         />
         <div className="flex gap-4">
-          <div className="w-[64%] min-w-0">
+          <div className="w-1/2 min-w-0">
             <div className="flex flex-col gap-2">
               <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Economic Data</span>
               <EconomicTable events={economic} />
             </div>
           </div>
-          <div className="w-[36%]">
+          <div className="w-1/2">
             <div className="flex flex-col gap-2">
               <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Earnings</span>
               <EarningsTable events={earnings} />
