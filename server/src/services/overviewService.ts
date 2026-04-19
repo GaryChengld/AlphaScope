@@ -27,7 +27,7 @@ export async function getMarketIndicators(): Promise<MarketIndicator[]> {
   const prices = await getLivePrices(MARKET_TICKERS);
   return MARKET_TICKERS.map((ticker) => ({
     ticker,
-    label: MARKET_LABELS[ticker],
+    label: MARKET_LABELS[ticker] ?? ticker,
     price: prices[ticker]?.price ?? null,
     change: prices[ticker]?.change ?? null,
     changePct: prices[ticker]?.changePct ?? null,
@@ -62,7 +62,7 @@ export async function getSectorPrices(): Promise<SectorPrice[]> {
   const prices = await getLivePrices(SECTOR_TICKERS);
   return SECTOR_TICKERS.map((ticker) => ({
     ticker,
-    name: SECTOR_NAMES[ticker],
+    name: SECTOR_NAMES[ticker] ?? ticker,
     changePct: prices[ticker]?.changePct ?? null,
   }));
 }
