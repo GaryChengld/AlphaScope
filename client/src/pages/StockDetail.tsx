@@ -158,6 +158,11 @@ export default function StockDetail() {
   if (!ticker) return null;
 
   const isIndex = summary?.quoteType === 'INDEX' || ticker.startsWith('^');
+  const isStock = summary?.quoteType === 'EQUITY';
+  const visibleTabs = (['fundamentals', 'technicals', 'news'] as const).filter(
+    (t) => t !== 'fundamentals' || isStock,
+  );
+  const activeTab = tab === 'fundamentals' && !isStock ? 'technicals' : tab;
   const positive = (summary?.change ?? 0) >= 0;
   const changeColor = positive ? 'text-green-400' : 'text-red-400';
   const changeSign = positive ? '+' : '';
@@ -278,12 +283,12 @@ export default function StockDetail() {
       <div className="flex flex-col flex-1 min-h-0">
         {/* Tab bar */}
         <div className="flex border-b border-gray-800 px-5 shrink-0">
-          {(['fundamentals', 'technicals', 'news'] as const).map((t) => (
+          {visibleTabs.map((t) => (
             <button
               key={t}
               onClick={() => setTab(t)}
               className={`px-4 py-2.5 text-sm font-medium capitalize border-b-2 transition-colors -mb-px
-                ${tab === t
+                ${activeTab === t
                   ? 'border-blue-400 text-blue-400'
                   : 'border-transparent text-gray-500 hover:text-gray-300'
                 }`}
@@ -295,7 +300,7 @@ export default function StockDetail() {
 
         {/* Tab panels */}
         <div className="px-5 py-4 overflow-y-auto flex-1">
-          {tab === 'fundamentals' && (
+          {activeTab === 'fundamentals' && (
             <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
 
               <FundGroup title="Valuation">
@@ -359,7 +364,7 @@ export default function StockDetail() {
             </div>
           )}
 
-          {tab === 'technicals' && (
+          {activeTab === 'technicals' && (
             <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
               {/* Moving Averages */}
               <div>
@@ -439,7 +444,7 @@ export default function StockDetail() {
             </div>
           )}
 
-          {tab === 'news' && (
+          {activeTab === 'news' && (
             news.length === 0
               ? <p className="text-sm text-gray-600">No recent news available.</p>
               : <div className="flex flex-col divide-y divide-gray-800">
