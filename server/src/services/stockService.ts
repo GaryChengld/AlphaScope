@@ -1,4 +1,4 @@
-import { SMA, RSI, ATR, MACD, BollingerBands, Stochastic } from 'technicalindicators';
+import { SMA, RSI, ATR, MACD, BollingerBands, Stochastic, ADX } from 'technicalindicators';
 import { yf } from '../lib/yf';
 import { subDate, today, tomorrow } from '../lib/dateUtils';
 
@@ -67,10 +67,12 @@ export function computeTechnicals(candles: { close: number; high: number; low: n
   const macdArr  = MACD.calculate({ fastPeriod: 12, slowPeriod: 26, signalPeriod: 9, values: closes, SimpleMAOscillator: false, SimpleMASignal: false });
   const bbArr    = BollingerBands.calculate({ period: 20, stdDev: 2, values: closes });
   const stochArr = Stochastic.calculate({ high: highs, low: lows, close: closes, period: 14, signalPeriod: 3 });
+  const adxArr   = ADX.calculate({ period: 14, high: highs, low: lows, close: closes });
 
   const macdLast  = last(macdArr);
   const bbLast    = last(bbArr);
   const stochLast = last(stochArr);
+  const adxLast   = last(adxArr);
 
   return {
     ma5:   sma(5),
@@ -89,6 +91,9 @@ export function computeTechnicals(candles: { close: number; high: number; low: n
       : null,
     stochastic: stochLast
       ? { k: stochLast.k, d: stochLast.d }
+      : null,
+    adx: adxLast
+      ? { adx: adxLast.adx, pdi: adxLast.pdi, mdi: adxLast.mdi }
       : null,
   };
 }
@@ -208,6 +213,120 @@ export async function getStockSummary(ticker: string): Promise<Record<string, an
     freeCashflow:      fd.freeCashflow      ?? null,
     // technicals
     technicals,
+  };
+}
+
+// ─── Analysis ────────────────────────────────────────────────────────────────
+
+export interface StockAnalysis {
+  targetMeanPrice: number | null;
+  targetMedianPrice: number | null;
+  targetHighPrice: number | null;
+  targetLowPrice: number | null;
+  numberOfAnalystOpinions: number | null;
+  recommendationKey: string | null;
+  recommendationMean: number | null;
+  recommendationBreakdown: {
+    strongBuy: number; buy: number; hold: number; sell: number; strongSell: number;
+  } | null;
+  valuation: { description: string; discount: string; relativeValue: string; provider: string } | null;
+  keyTechnicals: { support: number; resistance: number; stopLoss: number; provider: string } | null;
+  technicalOutlook: {
+    shortTerm:    { direction: string; score: number; description: string };
+    intermediate: { direction: string; score: number; description: string };
+    longTerm:     { direction: string; score: number; description: string };
+    provider: string;
+  } | null;
+  analystActions: Array<{
+    date: string;
+    firm: string;
+    fromGrade: string | null;
+    toGrade: string;
+    action: string;
+    currentPriceTarget: number | null;
+  }>;
+}
+
+export async function getStockAnalysis(ticker: string): Promise<StockAnalysis> {
+  const [summaryResult, insightsResult] = await Promise.allSettled([
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (yf.quoteSummary as any)(ticker, {
+      modules: ['financialData', 'recommendationTrend', 'upgradeDowngradeHistory'],
+    }, { validateResult: false }),
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (yf.insights as any)(ticker, {}, { validateResult: false }),
+  ]);
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const qs = summaryResult.status === 'fulfilled' ? summaryResult.value as any : null;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const ins = insightsResult.status === 'fulfilled' ? insightsResult.value as any : null;
+
+  const fd  = qs?.financialData ?? {};
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const trend: any = qs?.recommendationTrend?.trend?.[0] ?? null;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const history: any[] = qs?.upgradeDowngradeHistory?.history ?? [];
+  const instrInfo = ins?.instrumentInfo ?? null;
+  const valuation = instrInfo?.valuation ?? null;
+  const keyTech   = instrInfo?.keyTechnicals ?? null;
+  const techEv    = instrInfo?.technicalEvents ?? null;
+
+  return {
+    targetMeanPrice:          fd.targetMeanPrice          ?? null,
+    targetMedianPrice:        fd.targetMedianPrice        ?? null,
+    targetHighPrice:          fd.targetHighPrice          ?? null,
+    targetLowPrice:           fd.targetLowPrice           ?? null,
+    numberOfAnalystOpinions:  fd.numberOfAnalystOpinions  ?? null,
+    recommendationKey:        fd.recommendationKey        ?? null,
+    recommendationMean:       fd.recommendationMean       ?? null,
+    recommendationBreakdown: trend ? {
+      strongBuy:  trend.strongBuy  ?? 0,
+      buy:        trend.buy        ?? 0,
+      hold:       trend.hold       ?? 0,
+      sell:       trend.sell       ?? 0,
+      strongSell: trend.strongSell ?? 0,
+    } : null,
+    valuation: valuation ? {
+      description:   valuation.description   ?? '',
+      discount:      valuation.discount      ?? '',
+      relativeValue: valuation.relativeValue ?? '',
+      provider:      valuation.provider      ?? 'Trading Central',
+    } : null,
+    keyTechnicals: keyTech ? {
+      support:    keyTech.support    ?? 0,
+      resistance: keyTech.resistance ?? 0,
+      stopLoss:   keyTech.stopLoss   ?? 0,
+      provider:   keyTech.provider   ?? 'Trading Central',
+    } : null,
+    technicalOutlook: techEv ? {
+      shortTerm: {
+        direction:   techEv.shortTermOutlook?.direction        ?? '',
+        score:       techEv.shortTermOutlook?.score            ?? 0,
+        description: techEv.shortTermOutlook?.stateDescription ?? '',
+      },
+      intermediate: {
+        direction:   techEv.intermediateTermOutlook?.direction        ?? '',
+        score:       techEv.intermediateTermOutlook?.score            ?? 0,
+        description: techEv.intermediateTermOutlook?.stateDescription ?? '',
+      },
+      longTerm: {
+        direction:   techEv.longTermOutlook?.direction        ?? '',
+        score:       techEv.longTermOutlook?.score            ?? 0,
+        description: techEv.longTermOutlook?.stateDescription ?? '',
+      },
+      provider: techEv.provider ?? 'Trading Central',
+    } : null,
+    analystActions: history.slice(0, 10).map((h) => ({
+      date:               h.epochGradeDate instanceof Date
+                            ? h.epochGradeDate.toISOString().slice(0, 10)
+                            : String(h.epochGradeDate ?? '').slice(0, 10),
+      firm:               h.firm        ?? '',
+      fromGrade:          h.fromGrade   ?? null,
+      toGrade:            h.toGrade     ?? '',
+      action:             h.action      ?? '',
+      currentPriceTarget: h.currentPriceTarget ?? null,
+    })),
   };
 }
 

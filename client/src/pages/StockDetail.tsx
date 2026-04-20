@@ -14,6 +14,7 @@ interface Technicals {
   macd: { macd: number | null; signal: number | null; histogram: number | null } | null;
   bollingerBands: { upper: number; middle: number; lower: number } | null;
   stochastic: { k: number; d: number } | null;
+  adx: { adx: number; pdi: number; mdi: number } | null;
 }
 
 interface Summary {
@@ -44,6 +45,29 @@ interface Summary {
   currentRatio: number | null; quickRatio: number | null;
   operatingCashflow: number | null; freeCashflow: number | null;
   technicals: Technicals | null;
+}
+
+interface StockAnalysis {
+  targetMeanPrice: number | null;
+  targetMedianPrice: number | null;
+  targetHighPrice: number | null;
+  targetLowPrice: number | null;
+  numberOfAnalystOpinions: number | null;
+  recommendationKey: string | null;
+  recommendationMean: number | null;
+  recommendationBreakdown: { strongBuy: number; buy: number; hold: number; sell: number; strongSell: number } | null;
+  valuation: { description: string; discount: string; relativeValue: string; provider: string } | null;
+  keyTechnicals: { support: number; resistance: number; stopLoss: number; provider: string } | null;
+  technicalOutlook: {
+    shortTerm:    { direction: string; score: number; description: string };
+    intermediate: { direction: string; score: number; description: string };
+    longTerm:     { direction: string; score: number; description: string };
+    provider: string;
+  } | null;
+  analystActions: Array<{
+    date: string; firm: string; fromGrade: string | null;
+    toGrade: string; action: string; currentPriceTarget: number | null;
+  }>;
 }
 
 interface NewsItem {
@@ -120,21 +144,268 @@ function MaRow({ label, value, price }: { label: string; value: number | null; p
   );
 }
 
+// ─── Analysis Panel ───────────────────────────────────────────────────────────
+
+const REC_CONFIG: Record<string, { label: string; color: string }> = {
+  strong_buy:  { label: 'Strong Buy',  color: 'bg-green-600 text-white' },
+  buy:         { label: 'Buy',         color: 'bg-green-500 text-white' },
+  hold:        { label: 'Hold',        color: 'bg-yellow-500 text-gray-900' },
+  sell:        { label: 'Sell',        color: 'bg-red-500 text-white' },
+  strong_sell: { label: 'Strong Sell', color: 'bg-red-700 text-white' },
+};
+
+const ACTION_CONFIG: Record<string, { label: string; color: string }> = {
+  up:   { label: 'Upgrade',   color: 'text-green-400 bg-green-400/10' },
+  down: { label: 'Downgrade', color: 'text-red-400 bg-red-400/10' },
+  init: { label: 'Initiate',  color: 'text-blue-400 bg-blue-400/10' },
+  main: { label: 'Maintain',  color: 'text-gray-400 bg-gray-700/40' },
+  reit: { label: 'Reiterate', color: 'text-gray-400 bg-gray-700/40' },
+};
+
+function AnalysisPanel({ analysis, loading, currentPrice }: {
+  analysis: StockAnalysis | null;
+  loading: boolean;
+  currentPrice: number | null;
+}) {
+  if (loading) {
+    return (
+      <div className="flex flex-col gap-3">
+        {Array.from({ length: 6 }).map((_, i) => (
+          <div key={i} className="h-8 rounded bg-gray-800 animate-pulse" />
+        ))}
+      </div>
+    );
+  }
+  if (!analysis) {
+    return <p className="text-sm text-gray-600">Analysis data unavailable.</p>;
+  }
+
+  const rec = REC_CONFIG[analysis.recommendationKey ?? ''];
+  const bd  = analysis.recommendationBreakdown;
+  const total = bd ? bd.strongBuy + bd.buy + bd.hold + bd.sell + bd.strongSell : 0;
+
+  const valDesc = analysis.valuation?.description ?? '';
+  const valColor = valDesc.toLowerCase().includes('under') || valDesc.toLowerCase().includes('fair')
+    ? 'text-green-400' : valDesc.toLowerCase().includes('over')
+    ? 'text-red-400' : 'text-yellow-400';
+
+  const dirColor = (d: string) =>
+    d.toLowerCase() === 'bullish' ? 'text-green-400 bg-green-400/10'
+    : d.toLowerCase() === 'bearish' ? 'text-red-400 bg-red-400/10'
+    : 'text-gray-400 bg-gray-700/40';
+
+  return (
+    <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
+
+      {/* ── Left column: Analyst Consensus + Breakdown ── */}
+      <div className="flex flex-col gap-5">
+
+        {/* Consensus */}
+        <div>
+          <div className="text-[10px] text-gray-600 uppercase tracking-wider mb-2">Analyst Consensus</div>
+          <div className="border border-gray-800 rounded-lg px-4 py-3 flex flex-col gap-3">
+            <div className="flex items-center gap-3">
+              {rec && (
+                <span className={`text-sm font-semibold px-3 py-1 rounded-full ${rec.color}`}>
+                  {rec.label}
+                </span>
+              )}
+              {analysis.recommendationMean != null && (
+                <span className="text-xs text-gray-500">
+                  {analysis.recommendationMean.toFixed(2)} / 5.0
+                </span>
+              )}
+              {analysis.numberOfAnalystOpinions != null && (
+                <span className="text-xs text-gray-600 ml-auto">
+                  {analysis.numberOfAnalystOpinions} analysts
+                </span>
+              )}
+            </div>
+            <div className="grid grid-cols-2 gap-x-6 gap-y-0.5 text-xs">
+              <div className="flex justify-between">
+                <span className="text-gray-500">Mean Target</span>
+                <span className="text-gray-200 tabular-nums">{fmt(analysis.targetMeanPrice)}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-500">Median</span>
+                <span className="text-gray-200 tabular-nums">{fmt(analysis.targetMedianPrice)}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-500">High</span>
+                <span className="text-green-400 tabular-nums">{fmt(analysis.targetHighPrice)}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-500">Low</span>
+                <span className="text-red-400 tabular-nums">{fmt(analysis.targetLowPrice)}</span>
+              </div>
+              {currentPrice != null && analysis.targetMeanPrice != null && (
+                <div className="flex justify-between col-span-2">
+                  <span className="text-gray-500">Upside (vs Mean)</span>
+                  <span className={`tabular-nums ${analysis.targetMeanPrice >= currentPrice ? 'text-green-400' : 'text-red-400'}`}>
+                    {((analysis.targetMeanPrice - currentPrice) / currentPrice * 100).toFixed(1)}%
+                  </span>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Breakdown bars */}
+        {bd && total > 0 && (
+          <div>
+            <div className="text-[10px] text-gray-600 uppercase tracking-wider mb-2">Recommendation Breakdown</div>
+            <div className="border border-gray-800 rounded-lg px-4 py-3 flex flex-col gap-2">
+              {([
+                { label: 'Strong Buy',  count: bd.strongBuy,  barColor: 'bg-green-600' },
+                { label: 'Buy',         count: bd.buy,        barColor: 'bg-green-400' },
+                { label: 'Hold',        count: bd.hold,       barColor: 'bg-yellow-400' },
+                { label: 'Sell',        count: bd.sell,       barColor: 'bg-red-400' },
+                { label: 'Strong Sell', count: bd.strongSell, barColor: 'bg-red-600' },
+              ] as const).map(({ label, count, barColor }) => (
+                <div key={label} className="flex items-center gap-2">
+                  <span className="text-xs text-gray-500 w-24 shrink-0">{label}</span>
+                  <div className="flex-1 h-2 bg-gray-800 rounded-full overflow-hidden">
+                    <div
+                      className={`h-full rounded-full ${barColor}`}
+                      style={{ width: `${(count / total) * 100}%` }}
+                    />
+                  </div>
+                  <span className="text-xs text-gray-400 w-5 text-right tabular-nums">{count}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* ── Right column: Valuation + Technical Outlook ── */}
+      <div className="flex flex-col gap-5">
+
+        {/* Valuation */}
+        {analysis.valuation && (
+          <div>
+            <div className="text-[10px] text-gray-600 uppercase tracking-wider mb-2">
+              Valuation <span className="normal-case text-gray-700">· {analysis.valuation.provider}</span>
+            </div>
+            <div className="border border-gray-800 rounded-lg px-4 py-3 flex flex-col gap-2">
+              <div className="flex items-center gap-3">
+                <span className={`text-sm font-semibold ${valColor}`}>{analysis.valuation.description}</span>
+                <span className={`text-xs font-medium px-2 py-0.5 rounded ${valColor} bg-current/10`}
+                  style={{ backgroundColor: 'transparent' }}>
+                  {analysis.valuation.discount}
+                </span>
+                <span className="text-xs text-gray-500 ml-auto">{analysis.valuation.relativeValue}</span>
+              </div>
+              {analysis.keyTechnicals && (
+                <div className="flex flex-col gap-0.5 pt-1 border-t border-gray-800">
+                  <div className="flex justify-between text-xs">
+                    <span className="text-gray-500">Support</span>
+                    <span className="text-gray-300 tabular-nums">{fmt(analysis.keyTechnicals.support)}</span>
+                  </div>
+                  <div className="flex justify-between text-xs">
+                    <span className="text-gray-500">Resistance</span>
+                    <span className="text-gray-300 tabular-nums">{fmt(analysis.keyTechnicals.resistance)}</span>
+                  </div>
+                  <div className="flex justify-between text-xs">
+                    <span className="text-gray-500">Stop Loss</span>
+                    <span className="text-gray-300 tabular-nums">{fmt(analysis.keyTechnicals.stopLoss)}</span>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Technical Outlook */}
+        {analysis.technicalOutlook && (
+          <div>
+            <div className="text-[10px] text-gray-600 uppercase tracking-wider mb-2">
+              Technical Outlook <span className="normal-case text-gray-700">· {analysis.technicalOutlook.provider}</span>
+            </div>
+            <div className="border border-gray-800 rounded-lg px-4 py-3 flex flex-col gap-2">
+              {([
+                { label: 'Short-term',    data: analysis.technicalOutlook.shortTerm },
+                { label: 'Intermediate',  data: analysis.technicalOutlook.intermediate },
+                { label: 'Long-term',     data: analysis.technicalOutlook.longTerm },
+              ] as const).map(({ label, data }) => (
+                <div key={label} className="flex items-center justify-between gap-2">
+                  <span className="text-xs text-gray-500 w-24 shrink-0">{label}</span>
+                  <span className={`text-[10px] font-medium px-2 py-0.5 rounded ${dirColor(data.direction)}`}>
+                    {data.direction}
+                  </span>
+                  <span className="text-xs text-gray-600 tabular-nums ml-auto">{data.score}/5</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* ── Full-width: Recent Analyst Actions ── */}
+      {analysis.analystActions.length > 0 && (
+        <div className="sm:col-span-2">
+          <div className="text-[10px] text-gray-600 uppercase tracking-wider mb-2">Recent Analyst Actions</div>
+          <div className="border border-gray-800 rounded-lg overflow-hidden">
+            <table className="w-full border-collapse">
+              <thead>
+                <tr className="bg-blue-950/60">
+                  <th className="text-xs font-semibold text-blue-300 uppercase tracking-wider text-left py-1.5 pl-3 pr-3">Date</th>
+                  <th className="text-xs font-semibold text-blue-300 uppercase tracking-wider text-left py-1.5 pr-3">Firm</th>
+                  <th className="text-xs font-semibold text-blue-300 uppercase tracking-wider text-left py-1.5 pr-3">Action</th>
+                  <th className="text-xs font-semibold text-blue-300 uppercase tracking-wider text-left py-1.5 pr-3">Grade</th>
+                  <th className="text-xs font-semibold text-blue-300 uppercase tracking-wider text-right py-1.5 pr-3">Target</th>
+                </tr>
+              </thead>
+              <tbody>
+                {analysis.analystActions.map((a, i) => {
+                  const actionCfg = ACTION_CONFIG[a.action] ?? { label: a.action, color: 'text-gray-400 bg-gray-700/40' };
+                  return (
+                    <tr key={i} className={`border-b border-gray-800 ${i % 2 === 0 ? 'bg-gray-900/50' : ''}`}>
+                      <td className="text-xs text-gray-400 py-1.5 pl-3 pr-3 whitespace-nowrap">{a.date}</td>
+                      <td className="text-xs text-gray-300 py-1.5 pr-3">{a.firm}</td>
+                      <td className="py-1.5 pr-3">
+                        <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded ${actionCfg.color}`}>
+                          {actionCfg.label}
+                        </span>
+                      </td>
+                      <td className="text-xs text-gray-300 py-1.5 pr-3">
+                        {a.fromGrade && a.fromGrade !== a.toGrade
+                          ? <span><span className="text-gray-600">{a.fromGrade} →</span> {a.toGrade}</span>
+                          : a.toGrade}
+                      </td>
+                      <td className="text-xs text-gray-300 py-1.5 pr-3 text-right tabular-nums">
+                        {a.currentPriceTarget != null ? `$${a.currentPriceTarget}` : '—'}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── Main page ────────────────────────────────────────────────────────────────
 
 export default function StockDetail() {
   const { ticker } = useParams<{ ticker: string }>();
   const [summary, setSummary] = useState<Summary | null>(null);
   const [news, setNews] = useState<NewsItem[]>([]);
+  const [analysis, setAnalysis] = useState<StockAnalysis | null>(null);
+  const [analysisLoading, setAnalysisLoading] = useState(false);
   const [loading, setLoading] = useState(true);
   const [period, setPeriod] = useState<Period>('1D');
-  const [tab, setTab] = useState<'fundamentals' | 'technicals' | 'news'>('fundamentals');
+  const [tab, setTab] = useState<'fundamentals' | 'technicals' | 'analysis' | 'news'>('fundamentals');
 
   useEffect(() => {
     if (!ticker) return;
     setLoading(true);
     setSummary(null);
     setNews([]);
+    setAnalysis(null);
 
     const fetchSummary = () =>
       fetch(`/api/stocks/${encodeURIComponent(ticker)}/summary`)
@@ -159,10 +430,22 @@ export default function StockDetail() {
 
   const isIndex = summary?.quoteType === 'INDEX' || ticker.startsWith('^');
   const isStock = summary?.quoteType === 'EQUITY';
-  const visibleTabs = (['fundamentals', 'technicals', 'news'] as const).filter(
-    (t) => t !== 'fundamentals' || isStock,
+  const visibleTabs = (['fundamentals', 'technicals', 'analysis', 'news'] as const).filter(
+    (t) => (t !== 'fundamentals' && t !== 'analysis') || isStock,
   );
-  const activeTab = tab === 'fundamentals' && !isStock ? 'technicals' : tab;
+  const activeTab = (tab === 'fundamentals' || tab === 'analysis') && !isStock ? 'technicals' : tab;
+
+  // Lazy-load analysis only when that tab is first opened
+  React.useEffect(() => {
+    if (activeTab !== 'analysis' || analysis !== null || !ticker) return;
+    setAnalysisLoading(true);
+    fetch(`/api/stocks/${encodeURIComponent(ticker)}/analysis`)
+      .then((r) => r.ok ? r.json() : null)
+      .then((d) => { if (d) setAnalysis(d); })
+      .catch(() => {})
+      .finally(() => setAnalysisLoading(false));
+  }, [activeTab, ticker, analysis]);
+
   const positive = (summary?.change ?? 0) >= 0;
   const changeColor = positive ? 'text-green-400' : 'text-red-400';
   const changeSign = positive ? '+' : '';
@@ -440,8 +723,28 @@ export default function StockDetail() {
                     </div>
                   );
                 })()}
+                {summary?.technicals?.adx && (() => {
+                  const { adx, pdi, mdi } = summary.technicals!.adx!;
+                  const label = adx >= 25 ? 'Strong' : adx >= 20 ? 'Moderate' : 'Weak';
+                  const color = adx >= 25 ? 'text-blue-400 bg-blue-400/10' : adx >= 20 ? 'text-yellow-400 bg-yellow-400/10' : 'text-gray-400 bg-gray-700/40';
+                  return (
+                    <div className="flex justify-between items-center py-1 border-b border-gray-800">
+                      <span className="text-xs text-gray-500">ADX (14)</span>
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs text-gray-400 tabular-nums">
+                          {adx.toFixed(1)} · <span className="text-green-400">+DI {pdi.toFixed(1)}</span> / <span className="text-red-400">−DI {mdi.toFixed(1)}</span>
+                        </span>
+                        <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded ${color}`}>{label}</span>
+                      </div>
+                    </div>
+                  );
+                })()}
               </div>
             </div>
+          )}
+
+          {activeTab === 'analysis' && (
+            <AnalysisPanel analysis={analysis} loading={analysisLoading} currentPrice={summary?.price ?? null} />
           )}
 
           {activeTab === 'news' && (
