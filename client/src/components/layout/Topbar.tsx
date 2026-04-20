@@ -1,9 +1,10 @@
-import { useState, useEffect, useRef } from 'react';
-import { useNavigate, NavLink, Link } from 'react-router-dom';
+import { useEffect, useState } from 'react';
+import { NavLink, Link } from 'react-router-dom';
 import { Search, Bell, Settings } from 'lucide-react';
 
 interface TopbarProps {
   onBellClick: () => void;
+  onSearchClick: () => void;
 }
 
 function useMarketClock() {
@@ -46,24 +47,8 @@ const STATUS_COLOR: Record<string, string> = {
   CLOSED: 'text-gray-500',
 };
 
-export default function Topbar({ onBellClick }: TopbarProps) {
-  const navigate = useNavigate();
+export default function Topbar({ onBellClick, onSearchClick }: TopbarProps) {
   const { time, status } = useMarketClock();
-  const [query, setQuery] = useState('');
-  const [focused, setFocused] = useState(false);
-  const [dropdownOpen, setDropdownOpen] = useState(false);
-  const inputRef = useRef<HTMLInputElement>(null);
-
-  function handleKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
-    if (e.key === 'Enter' && query.trim()) {
-      setDropdownOpen(false);
-      navigate(`/search?q=${encodeURIComponent(query.trim())}`);
-    }
-    if (e.key === 'Escape') {
-      setDropdownOpen(false);
-      inputRef.current?.blur();
-    }
-  }
 
   return (
     <header className="h-16 flex items-center gap-4 px-4 border-b border-gray-800 bg-gray-800 shrink-0">
@@ -72,50 +57,14 @@ export default function Topbar({ onBellClick }: TopbarProps) {
         Alpha Scope
       </Link>
 
-      {/* Search — left of title, expands on focus */}
-      <div className={`relative transition-all duration-200 ${focused ? 'w-[432px]' : 'w-60'}`}>
-        <Search
-          size={14}
-          className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-500 pointer-events-none"
-        />
-        <input
-          ref={inputRef}
-          type="text"
-          value={query}
-          onChange={(e) => {
-            setQuery(e.target.value);
-            setDropdownOpen(e.target.value.length > 0);
-          }}
-          onFocus={() => {
-            setFocused(true);
-            if (query.length > 0) setDropdownOpen(true);
-          }}
-          onBlur={() => {
-            setFocused(false);
-            setTimeout(() => setDropdownOpen(false), 150);
-          }}
-          onKeyDown={handleKeyDown}
-          placeholder="Search…"
-          className="w-full bg-gray-900 border border-gray-700 rounded-md pl-8 pr-3 py-1.5 text-sm text-gray-100 placeholder:text-gray-600 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/40"
-        />
-        {dropdownOpen && (
-          <div className="absolute top-full mt-1 left-0 right-0 bg-gray-900 border border-gray-700 rounded-md shadow-xl z-50 py-1">
-            <button
-              className="w-full text-left px-3 py-2 text-sm text-gray-300 hover:bg-gray-800"
-              onMouseDown={() => {
-                navigate(`/search?q=${encodeURIComponent(query.trim())}`);
-                setDropdownOpen(false);
-              }}
-            >
-              <span className="text-gray-500 mr-1">
-                <Search size={12} className="inline mr-1" />
-                Search for
-              </span>
-              <span className="text-blue-400 font-medium">"{query}"</span>
-            </button>
-          </div>
-        )}
-      </div>
+      {/* Search button */}
+      <button
+        onClick={onSearchClick}
+        className="p-1.5 rounded hover:bg-gray-700 text-gray-400 hover:text-gray-100 transition-colors"
+        aria-label="Search"
+      >
+        <Search size={16} />
+      </button>
 
       {/* Spacer pushes clock + bell to the right */}
       <div className="flex-1" />

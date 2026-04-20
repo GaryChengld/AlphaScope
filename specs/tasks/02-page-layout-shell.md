@@ -17,7 +17,7 @@ Key constraints:
 ```
 ┌─ bg-gray-900 gutter (10%) ──────────────────────────────── gutter (10%) ─┐
 │ ┌─ bg-gray-950 ───────────────────────────────────────────────────────┐  │
-│ │ TOPBAR: [Alpha Scope] [🔍 Search…] ── spacer ── [clock·status] [🔔][⚙]│ │
+│ │ TOPBAR: [Alpha Scope] [🔍] ── spacer ── [clock·status] [🔔][⚙]        │ │
 │ ├─────────────────────────────────────────────────────────────────────┤  │
 │ │ SIDEBAR (300px) │ MAIN CONTENT (flex-1)  │ RIGHT PANEL (360px)     │  │
 │ └─────────────────────────────────────────────────────────────────────┘  │
@@ -31,7 +31,7 @@ Key constraints:
 Order (left → right): **Logo** · **Search** · spacer · **Clock + Status** · **Bell** · **Settings**
 
 - **Logo** — "Alpha Scope" in blue, `text-[17.5px]` (14px base × 1.25)
-- **Search** — left of spacer, icon on left; collapses to `w-60` (240px), expands to `w-[432px]` on focus; inline dropdown on type, Enter navigates to `/search?q=...`
+- **Search** — icon button (Search 16px) left of spacer; click navigates to `/search`
 - **Clock + Status** — ET time + badge (`OPEN` green / `PRE-MARKET` yellow / `AFTER-HOURS` orange / `CLOSED` gray)
 - **Bell** — toggles right panel open/closed
 - **Settings** — `NavLink` to `/settings`, highlights blue when active
