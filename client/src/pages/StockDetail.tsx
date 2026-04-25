@@ -185,7 +185,7 @@ function AnalysisPanel({ analysis, loading, currentPrice }: {
   const total = bd ? bd.strongBuy + bd.buy + bd.hold + bd.sell + bd.strongSell : 0;
 
   const valDesc = analysis.valuation?.description ?? '';
-  const valColor = valDesc.toLowerCase().includes('under') || valDesc.toLowerCase().includes('fair')
+  const valColor = valDesc.toLowerCase().includes('under')
     ? 'text-green-400' : valDesc.toLowerCase().includes('over')
     ? 'text-red-400' : 'text-yellow-400';
 
@@ -222,30 +222,34 @@ function AnalysisPanel({ analysis, loading, currentPrice }: {
               )}
             </div>
             <div className="grid grid-cols-2 gap-x-6 gap-y-0.5 text-xs">
-              <div className="flex justify-between">
-                <span className="text-gray-500">Mean Target</span>
-                <span className="text-gray-200 tabular-nums">{fmt(analysis.targetMeanPrice)}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-500">Median</span>
-                <span className="text-gray-200 tabular-nums">{fmt(analysis.targetMedianPrice)}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-500">High</span>
-                <span className="text-green-400 tabular-nums">{fmt(analysis.targetHighPrice)}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-500">Low</span>
-                <span className="text-red-400 tabular-nums">{fmt(analysis.targetLowPrice)}</span>
-              </div>
-              {currentPrice != null && analysis.targetMeanPrice != null && (
-                <div className="flex justify-between col-span-2">
-                  <span className="text-gray-500">Upside (vs Mean)</span>
-                  <span className={`tabular-nums ${analysis.targetMeanPrice >= currentPrice ? 'text-green-400' : 'text-red-400'}`}>
-                    {((analysis.targetMeanPrice - currentPrice) / currentPrice * 100).toFixed(1)}%
-                  </span>
+              <div className="flex flex-col gap-0.5">
+                <div className="flex justify-between">
+                  <span className="text-gray-500">Mean Target</span>
+                  <span className="text-gray-200 tabular-nums">{fmt(analysis.targetMeanPrice)}</span>
                 </div>
-              )}
+                {currentPrice != null && analysis.targetMeanPrice != null && (
+                  <div className="flex justify-between">
+                    <span className="text-gray-500">Upside (vs Mean)</span>
+                    <span className={`tabular-nums ${analysis.targetMeanPrice >= currentPrice ? 'text-green-400' : 'text-red-400'}`}>
+                      {((analysis.targetMeanPrice - currentPrice) / currentPrice * 100).toFixed(1)}%
+                    </span>
+                  </div>
+                )}
+              </div>
+              <div className="flex flex-col gap-0.5">
+                <div className="flex justify-between">
+                  <span className="text-gray-500">High</span>
+                  <span className="text-green-400 tabular-nums">{fmt(analysis.targetHighPrice)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-500">Median</span>
+                  <span className="text-gray-200 tabular-nums">{fmt(analysis.targetMedianPrice)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-500">Low</span>
+                  <span className="text-red-400 tabular-nums">{fmt(analysis.targetLowPrice)}</span>
+                </div>
+              </div>
             </div>
           </div>
         </div>
