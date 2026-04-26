@@ -1,5 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import TradingViewChart from '../components/TradingViewChart';
 import IndexChart from '../components/IndexChart';
 import WatchlistBookmark from '../components/WatchlistBookmark';
@@ -402,7 +404,13 @@ export default function StockDetail() {
   const [analysisLoading, setAnalysisLoading] = useState(false);
   const [loading, setLoading] = useState(true);
   const [period, setPeriod] = useState<Period>('1D');
-  const [tab, setTab] = useState<'fundamentals' | 'technicals' | 'analysis' | 'news'>('fundamentals');
+  const [tab, setTab] = useState<'fundamentals' | 'technicals' | 'analysis' | 'strategy' | 'news'>('fundamentals');
+
+  const [strategies, setStrategies] = useState<{ id: string; name: string; version: string }[] | null>(null);
+  const [selectedStrategyId, setSelectedStrategyId] = useState<string>('');
+  const [strategyMarkdown, setStrategyMarkdown] = useState<string | null>(null);
+  const [strategyLoading, setStrategyLoading] = useState(false);
+  const [strategyError, setStrategyError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!ticker) return;
@@ -410,6 +418,8 @@ export default function StockDetail() {
     setSummary(null);
     setNews([]);
     setAnalysis(null);
+    setStrategyMarkdown(null);
+    setStrategyError(null);
 
     const fetchSummary = () =>
       fetch(`/api/stocks/${encodeURIComponent(ticker)}/summary`)
@@ -434,10 +444,18 @@ export default function StockDetail() {
 
   const isIndex = summary?.quoteType === 'INDEX' || ticker.startsWith('^');
   const isStock = summary?.quoteType === 'EQUITY';
-  const visibleTabs = (['fundamentals', 'technicals', 'analysis', 'news'] as const).filter(
-    (t) => (t !== 'fundamentals' && t !== 'analysis') || isStock,
-  );
-  const activeTab = (tab === 'fundamentals' || tab === 'analysis') && !isStock ? 'technicals' : tab;
+  const isEtf = summary?.quoteType === 'ETF';
+  const strategyEligible = isStock || isEtf;
+  const visibleTabs = (['fundamentals', 'technicals', 'analysis', 'strategy', 'news'] as const).filter((t) => {
+    if (t === 'strategy') return strategyEligible;
+    if (t === 'fundamentals' || t === 'analysis') return isStock;
+    return true;
+  });
+  const activeTab = (() => {
+    if ((tab === 'fundamentals' || tab === 'analysis') && !isStock) return 'technicals';
+    if (tab === 'strategy' && !strategyEligible) return 'technicals';
+    return tab;
+  })();
 
   // Lazy-load analysis only when that tab is first opened
   React.useEffect(() => {
@@ -449,6 +467,39 @@ export default function StockDetail() {
       .catch(() => {})
       .finally(() => setAnalysisLoading(false));
   }, [activeTab, ticker, analysis]);
+
+  // Lazy-load enabled strategy list when the Strategy tab is first opened
+  React.useEffect(() => {
+    if (activeTab !== 'strategy' || strategies !== null) return;
+    fetch('/api/strategies')
+      .then((r) => r.ok ? r.json() : [])
+      .then((list: { id: string; name: string; version: string }[]) => {
+        setStrategies(list);
+        if (list.length > 0) setSelectedStrategyId(list[0].id);
+      })
+      .catch(() => setStrategies([]));
+  }, [activeTab, strategies]);
+
+  const runEvaluate = async () => {
+    if (!selectedStrategyId || !ticker) return;
+    setStrategyLoading(true);
+    setStrategyError(null);
+    setStrategyMarkdown(null);
+    try {
+      const r = await fetch(
+        `/api/strategies/${encodeURIComponent(selectedStrategyId)}/evaluate/${encodeURIComponent(ticker)}`,
+      );
+      if (!r.ok) {
+        const j = await r.json().catch(() => ({} as { error?: string }));
+        throw new Error(j.error ?? `HTTP ${r.status}`);
+      }
+      setStrategyMarkdown(await r.text());
+    } catch (e) {
+      setStrategyError(e instanceof Error ? e.message : 'Unknown error');
+    } finally {
+      setStrategyLoading(false);
+    }
+  };
 
   const positive = (summary?.change ?? 0) >= 0;
   const changeColor = positive ? 'text-green-400' : 'text-red-400';
@@ -749,6 +800,63 @@ export default function StockDetail() {
 
           {activeTab === 'analysis' && (
             <AnalysisPanel analysis={analysis} loading={analysisLoading} currentPrice={summary?.price ?? null} />
+          )}
+
+          {activeTab === 'strategy' && (
+            <div className="flex flex-col gap-4">
+              {/* Toolbar: dropdown + Evaluate */}
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-xs text-gray-500 uppercase tracking-wider">Strategy</span>
+                <select
+                  value={selectedStrategyId}
+                  onChange={(e) => setSelectedStrategyId(e.target.value)}
+                  disabled={strategies === null || strategies.length === 0}
+                  className="bg-gray-800 border border-gray-700 rounded px-2 py-1 text-sm text-gray-200 focus:outline-none focus:border-blue-500 disabled:opacity-50"
+                >
+                  {strategies === null && <option value="">Loading…</option>}
+                  {strategies !== null && strategies.length === 0 && <option value="">No strategies available</option>}
+                  {strategies?.map((s) => (
+                    <option key={`${s.id}-${s.version}`} value={s.id}>
+                      {s.name} v{s.version}
+                    </option>
+                  ))}
+                </select>
+                <button
+                  onClick={runEvaluate}
+                  disabled={strategyLoading || !selectedStrategyId}
+                  className="px-3 py-1 text-sm font-medium rounded bg-blue-500/20 text-blue-400 border border-blue-500/30 hover:bg-blue-500/30 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                >
+                  {strategyLoading ? 'Evaluating…' : 'Evaluate'}
+                </button>
+              </div>
+
+              {/* Body */}
+              {!strategyLoading && !strategyMarkdown && !strategyError && (
+                <p className="text-sm text-gray-500">
+                  Select a strategy and click <span className="text-gray-300">Evaluate</span> to run it against {ticker}.
+                </p>
+              )}
+
+              {strategyLoading && (
+                <div className="space-y-2">
+                  <div className="h-5 w-1/3 bg-gray-800 rounded animate-pulse" />
+                  <div className="h-4 w-full bg-gray-800 rounded animate-pulse" />
+                  <div className="h-4 w-5/6 bg-gray-800 rounded animate-pulse" />
+                  <div className="h-4 w-4/6 bg-gray-800 rounded animate-pulse" />
+                  <div className="h-32 w-full bg-gray-800 rounded animate-pulse" />
+                </div>
+              )}
+
+              {strategyError && !strategyLoading && (
+                <p className="text-sm text-red-400">Failed to evaluate: {strategyError}</p>
+              )}
+
+              {strategyMarkdown && !strategyLoading && (
+                <div className="prose prose-invert prose-sm max-w-none prose-h1:text-base prose-h1:text-blue-400 prose-h1:mt-0 prose-h1:mb-1 prose-h2:text-sm prose-h2:mt-4 prose-h2:mb-2 prose-h3:text-sm prose-h3:mt-3 prose-h3:mb-1">
+                  <ReactMarkdown remarkPlugins={[remarkGfm]}>{strategyMarkdown}</ReactMarkdown>
+                </div>
+              )}
+            </div>
           )}
 
           {activeTab === 'news' && (

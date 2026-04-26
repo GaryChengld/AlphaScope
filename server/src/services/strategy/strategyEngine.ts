@@ -22,6 +22,7 @@ export interface SectionDef {
   maxPoints:  number;
   cap?:       number;
   note?:      string;
+  dependsOn?: { sections: number[]; minTotal: number };
   groups:     GroupDef[];
 }
 
@@ -29,7 +30,7 @@ export interface StrategyDefinition {
   id:        string;
   name:      string;
   version:   string;
-  requires:  { timeframes: IndicatorRequirements['timeframes'] };
+  requires:  IndicatorRequirements;
   mandatory: ConditionDef[];
   sections:  SectionDef[];
 }
@@ -84,14 +85,25 @@ function runCondition(def: ConditionDef, ctx: StrategyContext): ConditionResult 
   if (!ruleFn) {
     return { label: def.label, pass: false, points: def.points ?? 0, detail: `Unknown rule: ${def.rule}` };
   }
-  const result = ruleFn(ctx, def.params ?? {});
-  return {
-    label:   def.label,
-    pass:    result.pass,
-    points:  def.points ?? 0,
-    detail:  result.detail,
-    warning: def.warning ?? result.warning,
-  };
+  try {
+    const result = ruleFn(ctx, def.params ?? {});
+    return {
+      label:   def.label,
+      pass:    result.pass,
+      points:  def.points ?? 0,
+      detail:  result.detail,
+      warning: def.warning ?? result.warning,
+    };
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error(`[strategyEngine] rule "${def.rule}" threw:`, err);
+    return {
+      label:  def.label,
+      pass:   false,
+      points: def.points ?? 0,
+      detail: `Rule error: ${msg}`,
+    };
+  }
 }
 
 function evaluateGroup(group: GroupDef, ctx: StrategyContext): GroupResult {
@@ -131,23 +143,28 @@ export function evaluateStrategy(ctx: StrategyContext, strategy: StrategyDefinit
     };
   }
 
-  // Scoring sections
-  let sections1to4Score = 0;
+  // Scoring sections — `dependsOn` lets a section be skipped when the listed
+  // upstream sections (1-indexed) don't reach `minTotal` combined.
   const sections: SectionResult[] = [];
 
-  for (const section of strategy.sections) {
-    // Section 5 (1H Trigger) is only evaluated if sections 1–4 total ≥ 40
-    if (section.note?.includes('40') && sections1to4Score < 40) {
-      sections.push({ name: section.name, maxPoints: section.maxPoints, score: 0, groups: [] });
-      continue;
+  for (let i = 0; i < strategy.sections.length; i++) {
+    const section = strategy.sections[i];
+    const dep = section.dependsOn;
+    if (dep) {
+      const upstreamTotal = dep.sections.reduce((sum, idx1) => {
+        const prior = sections[idx1 - 1];
+        return sum + (prior?.score ?? 0);
+      }, 0);
+      if (upstreamTotal < dep.minTotal) {
+        sections.push({ name: section.name, maxPoints: section.maxPoints, score: 0, groups: [] });
+        continue;
+      }
     }
 
-    const groups     = section.groups.map(g => evaluateGroup(g, ctx));
-    const rawScore   = groups.reduce((s, g) => s + g.score, 0);
-    const score      = section.cap != null ? Math.min(rawScore, section.cap) : rawScore;
+    const groups   = section.groups.map(g => evaluateGroup(g, ctx));
+    const rawScore = groups.reduce((s, g) => s + g.score, 0);
+    const score    = section.cap != null ? Math.min(rawScore, section.cap) : rawScore;
     sections.push({ name: section.name, maxPoints: section.maxPoints, score, groups });
-
-    if (sections.length <= 4) sections1to4Score += score;
   }
 
   const totalScore = sections.reduce((s, sec) => s + sec.score, 0);

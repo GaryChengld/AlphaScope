@@ -1,4 +1,4 @@
-# 11 — Strategy Scanner (JSON-Driven Engine)
+# 11 — Strategy Engine (JSON-Driven)
 
 ## Goal
 
@@ -7,8 +7,6 @@ Build a backend strategy evaluation engine that:
 - Returns a structured `StrategyResult` JSON from the pure engine; `strategyService` converts it to Markdown (or future formats)
 - Is fully reusable — adding a new strategy requires only a new JSON file and, if needed, new rule functions
 - Exposes REST endpoints under `/api/strategies` so the client can list strategies and evaluate any stock
-
-Scanner batch job is **deferred** — on-demand evaluation via API only for now.
 
 ---
 
@@ -350,7 +348,7 @@ export function toMarkdown(result: StrategyResult): string
 - `mandatoryPass === false` → `**DO NOT ENTER**` banner, no scoring sections rendered
 
 **Known limitation — manual triggers in Section 5:**
-Two trigger conditions in the strategy JSON use `manualReview` (`"Descending trendline break"` at 8 pts, `"1H RSI divergence"` at 7 pts). Because `manualReview` returns `pass: false`, these are never selected by `best_trigger` and cannot contribute to the automated score. They appear in the report output as `⚠️ Manual review required` warnings. The automated scanner only scores the three detectable triggers: `hourlyStructureBreak` (8 pts), `hourlyEngulfing` (7 pts), and `hourlyEmaCrossover` (6 pts).
+Two trigger conditions in the strategy JSON use `manualReview` (`"Descending trendline break"` at 8 pts, `"1H RSI divergence"` at 7 pts). Because `manualReview` returns `pass: false`, these are never selected by `best_trigger` and cannot contribute to the automated score. They appear in the report output as `⚠️ Manual review required` warnings. The engine only scores the three detectable triggers: `hourlyStructureBreak` (8 pts), `hourlyEngulfing` (7 pts), and `hourlyEmaCrossover` (6 pts).
 
 ---
 

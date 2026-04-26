@@ -4,6 +4,13 @@
     "name":    "Multi-Timeframe Pullback Swing Trading",
     "version": "1.0",
     "file":    "multi_timeframe_pullback_v1.json",
+    "enabled": false
+  },
+  {
+    "id":      "multi_timeframe_pullback",
+    "name":    "Multi-Timeframe Pullback Swing Trading",
+    "version": "2.0",
+    "file":    "multi_timeframe_pullback_v2.json",
     "enabled": true
   }
 ]

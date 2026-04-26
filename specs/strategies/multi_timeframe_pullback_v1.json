@@ -350,6 +350,7 @@
       "maxPoints": 20,
       "cap": 20,
       "note": "Only evaluated when Sections 1–4 score ≥ 40 points combined",
+      "dependsOn": { "sections": [1, 2, 3, 4], "minTotal": 40 },
       "groups": [
         {
           "label": "Trigger Type",
@@ -369,7 +370,7 @@
               "label": "1H structure break — price above most recent 1H swing high"
             },
             {
-              "rule": "hourlyEngulfing",
+              "rule": "bullishReversalCandle",
               "params": { "timeframe": "1H" },
               "points": 7,
               "label": "Bullish engulfing or hammer/pin bar at daily support on 1H"
@@ -419,13 +420,13 @@
           "conditions": [
             {
               "rule": "triggerTiming",
-              "params": { "dailyTimeframe": "1D", "atrPeriod": 14, "maxDaysAfterSignal": 2 },
+              "params": { "dailyTimeframe": "1D", "atrPeriod": 14, "emaPeriods": [20, 50], "maxDaysAfterSignal": 2 },
               "points": 4,
               "label": "Trigger within 1–2 trading days of daily pullback signal"
             },
             {
               "rule": "triggerTiming",
-              "params": { "dailyTimeframe": "1D", "atrPeriod": 14, "maxDaysAfterSignal": 3 },
+              "params": { "dailyTimeframe": "1D", "atrPeriod": 14, "emaPeriods": [20, 50], "maxDaysAfterSignal": 3 },
               "points": 2,
               "label": "Trigger on day 3 after daily pullback signal"
             }

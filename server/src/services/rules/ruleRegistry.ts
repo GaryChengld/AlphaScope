@@ -1,5 +1,5 @@
 import { StrategyContext } from '../strategy/strategyContext';
-import { RuleResult } from './trendRules';
+import { RuleResult } from './types';
 import * as trend    from './trendRules';
 import * as pullback from './pullbackRules';
 import * as trigger  from './triggerRules';
@@ -29,9 +29,9 @@ export const RULES: Record<string, RuleFn> = {
   rsiLevel:            pullback.rsiLevel,
   rsiStructure:        pullback.rsiStructure,
   // Trigger
-  hourlyEmaCrossover:  trigger.hourlyEmaCrossover,
-  hourlyStructureBreak:trigger.hourlyStructureBreak,
-  hourlyEngulfing:     trigger.hourlyEngulfing,
+  hourlyEmaCrossover:    trigger.hourlyEmaCrossover,
+  hourlyStructureBreak:  trigger.hourlyStructureBreak,
+  bullishReversalCandle: trigger.bullishReversalCandle,
   triggerVolume:       trigger.triggerVolume,
   triggerTiming:       trigger.triggerTiming,
   triggerTimeOfDay:    trigger.triggerTimeOfDay,

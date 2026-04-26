@@ -1,7 +1,8 @@
 import fs   from 'fs';
 import path from 'path';
-import { buildStrategyContext, IndicatorRequirements } from './strategyContext';
+import { buildStrategyContext } from './strategyContext';
 import { evaluateStrategy, StrategyDefinition, StrategyResult, SectionResult } from './strategyEngine';
+import { RULES } from '../rules/ruleRegistry';
 
 const STRATEGIES_DIR = process.env.STRATEGIES_DIR
   ?? path.resolve(__dirname, '../../../../specs/strategies');
@@ -26,17 +27,72 @@ export function listStrategies(): { id: string; name: string; version: string }[
 }
 
 export function loadStrategy(id: string): StrategyDefinition {
-  const entry = readIndex().find(e => e.id === id);
-  if (!entry || !entry.enabled) throw new Error('STRATEGY_NOT_FOUND');
+  const entry = readIndex().find(e => e.id === id && e.enabled);
+  if (!entry) throw new Error('STRATEGY_NOT_FOUND');
   const filePath = path.join(STRATEGIES_DIR, entry.file);
   if (!fs.existsSync(filePath)) throw new Error('STRATEGY_NOT_FOUND');
-  return JSON.parse(fs.readFileSync(filePath, 'utf-8')) as StrategyDefinition;
+  const parsed = JSON.parse(fs.readFileSync(filePath, 'utf-8')) as StrategyDefinition;
+  validateStrategy(parsed, entry.file);
+  return parsed;
+}
+
+// ─── Validation ──────────────────────────────────────────────────────────────
+// Surface malformed strategy JSON at load time with a descriptive error rather
+// than letting it fail deep inside rule evaluation.
+
+const VALID_PICKS = new Set(['tiered', 'best_trigger', 'additive']);
+
+function validateStrategy(s: StrategyDefinition, fileName: string): void {
+  const fail = (msg: string): never => {
+    throw new Error(`Invalid strategy "${fileName}": ${msg}`);
+  };
+
+  for (const k of ['id', 'name', 'version', 'requires', 'mandatory', 'sections'] as const) {
+    if (s[k] == null) fail(`missing required field "${k}"`);
+  }
+  if (!s.requires?.timeframes || typeof s.requires.timeframes !== 'object') {
+    fail('"requires.timeframes" must be an object');
+  }
+  if (!Array.isArray(s.mandatory)) fail('"mandatory" must be an array');
+  if (!Array.isArray(s.sections) || s.sections.length === 0) {
+    fail('"sections" must be a non-empty array');
+  }
+
+  for (const m of s.mandatory) {
+    if (!RULES[m.rule]) fail(`mandatory rule "${m.rule}" is not registered`);
+  }
+
+  for (let i = 0; i < s.sections.length; i++) {
+    const sec = s.sections[i];
+    const tag = `sections[${i}] "${sec.name ?? '?'}"`;
+    if (typeof sec.maxPoints !== 'number') fail(`${tag}: "maxPoints" must be a number`);
+    if (!Array.isArray(sec.groups) || sec.groups.length === 0) {
+      fail(`${tag}: must have at least one group`);
+    }
+    for (let j = 0; j < sec.groups.length; j++) {
+      const g = sec.groups[j];
+      const gtag = `${tag} groups[${j}] "${g.label ?? '?'}"`;
+      if (!VALID_PICKS.has(g.pick)) fail(`${gtag}: "pick" must be tiered|best_trigger|additive`);
+      if (!Array.isArray(g.conditions) || g.conditions.length === 0) {
+        fail(`${gtag}: must have at least one condition`);
+      }
+      for (const c of g.conditions) {
+        if (!RULES[c.rule]) fail(`${gtag}: rule "${c.rule}" is not registered`);
+      }
+    }
+  }
+
+  // Total max points check — sections must sum to the declared total (default 100).
+  const declaredTotal = (s as StrategyDefinition & { totalMaxPoints?: number }).totalMaxPoints ?? 100;
+  const summed = s.sections.reduce((acc, sec) => acc + sec.maxPoints, 0);
+  if (summed !== declaredTotal) {
+    fail(`section maxPoints sum to ${summed}, expected totalMaxPoints=${declaredTotal}`);
+  }
 }
 
 export async function runStrategy(ticker: string, strategyId: string): Promise<StrategyResult> {
   const strategy = loadStrategy(strategyId);
-  const requires: IndicatorRequirements = { timeframes: strategy.requires.timeframes };
-  const ctx = await buildStrategyContext(ticker, requires);
+  const ctx = await buildStrategyContext(ticker, strategy.requires);
   return evaluateStrategy(ctx, strategy);
 }
 
@@ -51,21 +107,14 @@ function scoreDecision(score: number): string {
 }
 
 export function toMarkdown(result: StrategyResult): string {
-  const dt = new Date(result.generatedAt);
-  const dateStr = dt.toLocaleString('en-US', {
-    timeZone: 'America/New_York', month: 'short', day: 'numeric',
-    year: 'numeric', hour: '2-digit', minute: '2-digit',
-  });
-
   const lines: string[] = [
     `# ${result.strategyName} — ${result.ticker}`,
-    `*Generated: ${dateStr} ET · Strategy v${result.strategyVersion}*`,
     '',
     '## Mandatory Conditions',
   ];
 
   for (const m of result.mandatory) {
-    const check = m.pass ? '[x]' : '[ ]';
+    const check = m.pass ? '✅' : '❌';
     lines.push(`- ${check} ${m.label} — ${m.detail}`);
   }
   lines.push('');
@@ -91,7 +140,8 @@ export function toMarkdown(result: StrategyResult): string {
     lines.push(`| ${i + 1}. ${s.name} | ${s.maxPoints} | ${s.score} |`);
   }
 
-  lines.push(`| **TOTAL** | **100** | **${result.totalScore}** |`);
+  const totalMax = result.sections.reduce((s, sec) => s + sec.maxPoints, 0);
+  lines.push(`| **TOTAL** | **${totalMax}** | **${result.totalScore}** |`);
   lines.push('');
   lines.push(`### ${scoreDecision(result.totalScore)}`);
   lines.push('');
@@ -111,10 +161,21 @@ export function toMarkdown(result: StrategyResult): string {
 function renderSection(section: SectionResult, lines: string[]): void {
   for (const group of section.groups) {
     if (group.winner) {
+      // tiered / best_trigger — single winner
       lines.push(`**${group.label}** → ${group.winner.label} **+${group.winner.points} pts**`);
       lines.push(`  *${group.winner.detail}*`);
     } else {
-      lines.push(`**${group.label}** → *(no condition met — 0 pts)*`);
+      // No winner field — either additive (sum of passing) or no condition met
+      const passing = group.evaluated.filter(e => e.pass);
+      if (passing.length > 0) {
+        // additive: list each passing condition
+        lines.push(`**${group.label}** → **+${group.score} pts**`);
+        for (const c of passing) {
+          lines.push(`  - ${c.label} **+${c.points} pts** — *${c.detail}*`);
+        }
+      } else {
+        lines.push(`**${group.label}** → *(no condition met — 0 pts)*`);
+      }
     }
 
     // Show warnings for all evaluated conditions
