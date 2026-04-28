@@ -28,3 +28,27 @@ model Stock {
 
   @@unique([watchlistId, ticker])
 }
+
+model Notification {
+  id           Int                  @id @default(autoincrement())
+  strategyId   String
+  strategyName String
+  date         String
+  read         Boolean              @default(false)
+  createdAt    DateTime             @default(now())
+  tickers      NotificationTicker[]
+
+  @@unique([strategyId, date])
+}
+
+model NotificationTicker {
+  id             Int          @id @default(autoincrement())
+  notificationId Int
+  ticker         String
+  score          Int
+  markdown       String
+  addedAt        DateTime     @default(now())
+  notification   Notification @relation(fields: [notificationId], references: [id], onDelete: Cascade)
+
+  @@unique([notificationId, ticker])
+}

@@ -1,53 +1,58 @@
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Bell, BrainCircuit, X, ChevronRight } from 'lucide-react';
-import ReactMarkdown from 'react-markdown';
-import remarkGfm from 'remark-gfm';
+import { Bell, BrainCircuit, X, ChevronRight, ChevronDown, Trash2 } from 'lucide-react';
+
+interface NotificationTicker {
+  id: number;
+  ticker: string;
+  score: number;
+  markdown: string;
+  addedAt: string;
+}
 
 interface Notification {
-  id: string;
-  ticker: string;
-  strategy: string;
-  time: string;
+  id: number;
+  strategyId: string;
+  strategyName: string;
+  date: string;
+  read: boolean;
+  createdAt: string;
+  tickers: NotificationTicker[];
 }
-
-interface Analysis {
-  id: string;
-  ticker: string;
-  time: string;
-  content: string;
-}
-
-// Placeholder data — will be replaced by Socket.io events
-const NOTIFICATIONS: Notification[] = [
-  { id: '1', ticker: 'AAPL', strategy: 'RSI < 30', time: 'now' },
-  { id: '2', ticker: 'TSLA', strategy: 'SMA Breakout', time: '2m' },
-  { id: '3', ticker: 'NVDA', strategy: 'RSI < 30', time: '5m' },
-];
-
-const ANALYSES: Analysis[] = [
-  {
-    id: '1',
-    ticker: 'AAPL',
-    time: '10:32 AM',
-    content:
-      'AAPL shows **bullish divergence** on the RSI. Price made a lower low while RSI formed a higher low, suggesting weakening downside momentum. Support at **$210**.',
-  },
-  {
-    id: '2',
-    ticker: 'TSLA',
-    time: '10:15 AM',
-    content:
-      'The breakout above the **50-day SMA** on elevated volume is constructive. Watch for a retest of the breakout level near **$245** as potential support.',
-  },
-];
 
 interface RightPanelProps {
   open: boolean;
   onClose: () => void;
+  notifications: Notification[];
+  onMarkRead: (id: number) => void;
+  onDelete: (id: number) => void;
 }
 
-export default function RightPanel({ open, onClose }: RightPanelProps) {
+function relativeTime(iso: string): string {
+  const diff = Date.now() - new Date(iso).getTime();
+  const m = Math.floor(diff / 60000);
+  if (m < 1)  return 'just now';
+  if (m < 60) return `${m}m ago`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `${h}h ago`;
+  return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+}
+
+export default function RightPanel({ open, onClose, notifications, onMarkRead, onDelete }: RightPanelProps) {
   const navigate = useNavigate();
+  const [scanLoading, setScanLoading] = useState(false);
+  const [expandedId, setExpandedId] = useState<number | null>(null);
+
+  const unreadCount = notifications.filter(n => !n.read).length;
+
+  const toggleExpand = (id: number) =>
+    setExpandedId(prev => (prev === id ? null : id));
+
+  const handleRunScan = async () => {
+    setScanLoading(true);
+    await fetch('/api/scanner/run', { method: 'POST' }).catch(() => {});
+    setScanLoading(false);
+  };
 
   return (
     <aside
@@ -56,52 +61,116 @@ export default function RightPanel({ open, onClose }: RightPanelProps) {
     >
       {open && (
         <>
-          {/* Notifications section */}
+          {/* Notifications section header */}
           <div className="flex items-center justify-between px-3 pt-3 pb-1">
             <span className="flex items-center gap-1.5 text-xs font-semibold text-gray-400 uppercase tracking-wider">
               <Bell size={12} />
               Notifications
-              {NOTIFICATIONS.length > 0 && (
+              {unreadCount > 0 && (
                 <span className="bg-blue-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full">
-                  {NOTIFICATIONS.length}
+                  {unreadCount}
                 </span>
               )}
             </span>
-            <button
-              onClick={onClose}
-              className="p-1 rounded hover:bg-gray-800 text-gray-600 hover:text-gray-300 transition-colors"
-              aria-label="Close panel"
-            >
-              <X size={13} />
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={handleRunScan}
+                disabled={scanLoading}
+                className="text-[10px] text-blue-400 hover:text-blue-300 disabled:text-gray-600 transition-colors"
+              >
+                {scanLoading ? 'Scanning…' : 'Run Scan'}
+              </button>
+              <button
+                onClick={onClose}
+                className="p-1 rounded hover:bg-gray-800 text-gray-600 hover:text-gray-300 transition-colors"
+                aria-label="Close panel"
+              >
+                <X size={13} />
+              </button>
+            </div>
           </div>
 
-          <div className="overflow-y-auto flex-none max-h-48 px-2 pb-2">
-            {NOTIFICATIONS.length === 0 ? (
-              <p className="text-xs text-gray-600 px-2 py-3">No notifications</p>
+          {/* Notification cards */}
+          <div className="overflow-y-auto flex-none max-h-[55%] px-2 pb-2 space-y-1.5">
+            {notifications.length === 0 ? (
+              <p className="text-xs text-gray-600 px-2 py-3">
+                No notifications — click "Run Scan" to find setups
+              </p>
             ) : (
-              NOTIFICATIONS.map((n) => (
-                <button
+              notifications.map(n => (
+                <div
                   key={n.id}
-                  onClick={() => navigate(`/stock/${n.ticker}`)}
-                  className="w-full flex items-center justify-between px-2 py-2 rounded text-left hover:bg-gray-800 transition-colors group"
+                  className={`px-2 py-2 rounded border ${
+                    n.read ? 'border-gray-800 bg-gray-950' : 'border-blue-900 bg-gray-900'
+                  }`}
                 >
-                  <div>
+                  {/* Card header — click to expand/collapse */}
+                  <button
+                    onClick={() => toggleExpand(n.id)}
+                    className="w-full flex items-center justify-between"
+                  >
                     <div className="flex items-center gap-1.5">
-                      <span className="text-sm font-semibold text-gray-100">{n.ticker}</span>
-                      <span className="text-xs text-gray-500">{n.time}</span>
+                      {!n.read && (
+                        <span className="w-1.5 h-1.5 rounded-full bg-blue-500 shrink-0" />
+                      )}
+                      <span className={`text-xs font-semibold ${n.read ? 'text-gray-400' : 'text-gray-200'}`}>
+                        {n.strategyName}
+                      </span>
+                      <span className="text-[10px] text-gray-600">({n.tickers.length})</span>
                     </div>
-                    <span className="text-xs text-gray-400">{n.strategy}</span>
-                  </div>
-                  <ChevronRight size={13} className="text-gray-700 group-hover:text-gray-400" />
-                </button>
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-[10px] text-gray-600">{relativeTime(n.createdAt)}</span>
+                      <button
+                        onClick={e => { e.stopPropagation(); onDelete(n.id); }}
+                        className="p-0.5 rounded text-gray-700 hover:text-red-400 hover:bg-gray-800 transition-colors"
+                        aria-label="Delete notification"
+                      >
+                        <Trash2 size={11} />
+                      </button>
+                      {expandedId === n.id
+                        ? <ChevronDown size={11} className="text-gray-500" />
+                        : <ChevronRight size={11} className="text-gray-500" />
+                      }
+                    </div>
+                  </button>
+
+                  {/* Ticker list — only shown when expanded */}
+                  {expandedId === n.id && (
+                    <div className="mt-1.5 space-y-0.5">
+                      {n.tickers.map(t => (
+                        <button
+                          key={t.id}
+                          onClick={() => {
+                            onMarkRead(n.id);
+                            navigate(`/stock/${t.ticker}`, {
+                              state: {
+                                ticker: t.ticker,
+                                notificationMarkdown: t.markdown,
+                                strategyId: n.strategyId,
+                              },
+                            });
+                          }}
+                          className="w-full flex items-center justify-between text-left hover:bg-gray-800 rounded px-1 py-0.5 group"
+                        >
+                          <span className="text-sm font-semibold text-blue-400 group-hover:text-blue-300">
+                            {t.ticker}
+                          </span>
+                          <div className="flex items-center gap-1">
+                            <span className="text-xs text-gray-500">{t.score} pts</span>
+                            <ChevronRight size={11} className="text-gray-700 group-hover:text-gray-400" />
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
               ))
             )}
           </div>
 
           <div className="mx-3 border-t border-gray-800" />
 
-          {/* AI Analysis section */}
+          {/* AI Analysis section (placeholder) */}
           <div className="px-3 pt-3 pb-1">
             <span className="flex items-center gap-1.5 text-xs font-semibold text-gray-400 uppercase tracking-wider">
               <BrainCircuit size={12} />
@@ -109,33 +178,11 @@ export default function RightPanel({ open, onClose }: RightPanelProps) {
             </span>
           </div>
 
-          <div className="flex-1 overflow-y-auto px-2 pb-3 space-y-3">
-            {ANALYSES.length === 0 ? (
-              <p className="text-xs text-gray-600 px-2 py-3">No analysis yet</p>
-            ) : (
-              ANALYSES.map((a) => (
-                <div key={a.id} className="px-2 py-2 rounded bg-gray-900 border border-gray-800">
-                  <div className="flex items-center gap-1.5 mb-1.5">
-                    <button
-                      onClick={() => navigate(`/stock/${a.ticker}`)}
-                      className="text-xs font-semibold text-blue-400 hover:text-blue-300"
-                    >
-                      {a.ticker}
-                    </button>
-                    <span className="text-xs text-gray-600">{a.time}</span>
-                  </div>
-                  <div className="text-xs text-gray-300 leading-relaxed prose prose-invert prose-xs max-w-none">
-                    <ReactMarkdown remarkPlugins={[remarkGfm]}>{a.content}</ReactMarkdown>
-                  </div>
-                </div>
-              ))
-            )}
+          <div className="flex-1 overflow-y-auto px-2 pb-3">
+            <p className="text-xs text-gray-600 px-2 py-3">No analysis yet</p>
           </div>
         </>
       )}
-
-      {/* Collapsed toggle tab */}
-      {!open && null}
     </aside>
   );
 }

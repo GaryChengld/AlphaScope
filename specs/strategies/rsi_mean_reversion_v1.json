@@ -1,0 +1,202 @@
+{
+  "id": "rsi_mean_reversion",
+  "name": "RSI Mean Reversion (Range-Bound)",
+  "version": "1.0",
+  "totalMaxPoints": 100,
+
+  "requires": {
+    "timeframes": {
+      "1D": {
+        "ema":  [50, 200],
+        "atr":  [14],
+        "rsi":  [2, 14],
+        "adx":  [14],
+        "bb":   [{ "period": 20, "stdDev": 2 }]
+      }
+    },
+    "spy": { "ema": [50] }
+  },
+
+  "mandatory": [
+    { "rule": "adxLevel",             "params": { "timeframe": "1D", "period": 14, "max": 20 },                                                               "label": "Range-bound regime — ADX(14) < 20" },
+    { "rule": "rangeBound",           "params": { "timeframe": "1D", "lookback": 60, "atrPeriod": 14, "maxWidthAtr": 7, "minTouches": 2, "tolerance": 0.02 }, "label": "Defined 60-day horizontal range (≤7×ATR width, ≥2 touches each bound)" },
+    { "rule": "rsiOversoldEither",    "params": { "timeframe": "1D", "rsi2Max": 10, "rsi14Max": 30 },                                                        "label": "Oversold trigger — RSI(2) < 10 OR RSI(14) < 30" },
+    { "rule": "lowerBbTag",           "params": { "timeframe": "1D", "period": 20, "stdDev": 2 },                                                             "label": "Lower BB tagged or pierced today" },
+    { "rule": "bullishReversalCandle","params": { "timeframe": "1D", "pattern": "any" },                                                                      "label": "Bullish reversal candle (engulfing / hammer / pin / green-after-red)" },
+    { "rule": "triggerVolume",        "params": { "timeframe": "1D", "avgWindow": 20, "minPctAboveAvg": 0 },                                                  "label": "Reversal volume above 20-day average" },
+    { "rule": "liquidityFloor",       "params": { "timeframe": "1D", "avgWindow": 20, "minDollar": 5000000 },                                                 "label": "20-day avg dollar volume ≥ $5M" },
+    { "rule": "noNearEarnings",       "params": { "tradingDays": 5 },                                                                                         "label": "No earnings within 5 trading days" },
+    { "rule": "marketNotPanic",       "params": { "maxVix": 25, "minSpyDailyChangePct": -3 },                                                                 "label": "Market not in panic — VIX < 25 AND SPY not down 3%+" }
+  ],
+
+  "sections": [
+    {
+      "name": "Range Quality",
+      "maxPoints": 30,
+      "groups": [
+        {
+          "label": "Range Definition (touches at each bound)",
+          "pick": "tiered",
+          "conditions": [
+            { "rule": "rangeTouchCount", "params": { "timeframe": "1D", "lookback": 60, "atrPeriod": 14, "tolerance": 0.02, "minPerBound": 3 }, "points": 12, "label": "3+ touches at each bound (crisp)" },
+            { "rule": "rangeTouchCount", "params": { "timeframe": "1D", "lookback": 60, "atrPeriod": 14, "tolerance": 0.02, "minPerBound": 2 }, "points": 8,  "label": "2 touches at each bound (acceptable)" },
+            { "rule": "rangeTouchCount", "params": { "timeframe": "1D", "lookback": 60, "atrPeriod": 14, "tolerance": 0.02, "minPerBound": 1 }, "points": 4,  "label": "Loosely defined (mixed touches)" }
+          ]
+        },
+        {
+          "label": "Range Duration",
+          "pick": "tiered",
+          "conditions": [
+            { "rule": "rangeDuration", "params": { "timeframe": "1D", "lookback": 60, "atrPeriod": 14, "tolerance": 0.02, "minWeeks": 6 },               "points": 8, "label": "6+ weeks (mature)" },
+            { "rule": "rangeDuration", "params": { "timeframe": "1D", "lookback": 60, "atrPeriod": 14, "tolerance": 0.02, "minWeeks": 4, "maxWeeks": 6 }, "points": 5, "label": "4–6 weeks (developed)" },
+            { "rule": "rangeDuration", "params": { "timeframe": "1D", "lookback": 60, "atrPeriod": 14, "tolerance": 0.02, "minWeeks": 3, "maxWeeks": 4 }, "points": 3, "label": "3–4 weeks (young)" }
+          ]
+        },
+        {
+          "label": "ADX Reading",
+          "pick": "tiered",
+          "conditions": [
+            { "rule": "adxLevel", "params": { "timeframe": "1D", "period": 14, "max": 15 },              "points": 5, "label": "ADX < 15 (strong range regime)" },
+            { "rule": "adxLevel", "params": { "timeframe": "1D", "period": 14, "min": 15, "max": 20 },   "points": 3, "label": "ADX 15–20 (acceptable)" }
+          ]
+        },
+        {
+          "label": "Range Width (ATR-normalized)",
+          "pick": "tiered",
+          "conditions": [
+            { "rule": "rangeWidth", "params": { "timeframe": "1D", "lookback": 60, "atrPeriod": 14, "max": 3 },             "points": 5, "label": "≤3× ATR (narrow)" },
+            { "rule": "rangeWidth", "params": { "timeframe": "1D", "lookback": 60, "atrPeriod": 14, "min": 3, "max": 5 },   "points": 3, "label": "3–5× ATR (moderate)" },
+            { "rule": "rangeWidth", "params": { "timeframe": "1D", "lookback": 60, "atrPeriod": 14, "min": 5, "max": 7 },   "points": 1, "label": "5–7× ATR (wide but contained)" }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Oversold Quality",
+      "maxPoints": 25,
+      "groups": [
+        {
+          "label": "RSI(2) Reading",
+          "pick": "tiered",
+          "conditions": [
+            { "rule": "rsiLevel", "params": { "timeframe": "1D", "period": 2, "min": 0,  "max": 5  }, "points": 10, "label": "RSI(2) < 5 (extreme)" },
+            { "rule": "rsiLevel", "params": { "timeframe": "1D", "period": 2, "min": 5,  "max": 10 }, "points": 6,  "label": "RSI(2) 5–10 (deep)" },
+            { "rule": "rsiLevel", "params": { "timeframe": "1D", "period": 2, "min": 10, "max": 15 }, "points": 3,  "label": "RSI(2) 10–15 (moderate)" }
+          ]
+        },
+        {
+          "label": "RSI(14) Reading",
+          "pick": "tiered",
+          "conditions": [
+            { "rule": "rsiLevel", "params": { "timeframe": "1D", "period": 14, "min": 0,  "max": 25 }, "points": 7, "label": "RSI(14) < 25 (extreme)" },
+            { "rule": "rsiLevel", "params": { "timeframe": "1D", "period": 14, "min": 25, "max": 30 }, "points": 4, "label": "RSI(14) 25–30 (deep)" },
+            { "rule": "rsiLevel", "params": { "timeframe": "1D", "period": 14, "min": 30, "max": 35 }, "points": 1, "label": "RSI(14) 30–35 (mild)" }
+          ]
+        },
+        {
+          "label": "Consecutive Red Days",
+          "pick": "tiered",
+          "conditions": [
+            { "rule": "consecutiveRedBars", "params": { "timeframe": "1D", "min": 4 },           "points": 5, "label": "4+ consecutive red bars (capitulation)" },
+            { "rule": "consecutiveRedBars", "params": { "timeframe": "1D", "min": 2, "max": 3 }, "points": 3, "label": "2–3 consecutive red bars" },
+            { "rule": "consecutiveRedBars", "params": { "timeframe": "1D", "min": 1, "max": 1 }, "points": 1, "label": "1 red bar" }
+          ]
+        },
+        {
+          "label": "Bullish RSI Divergence (bonus)",
+          "pick": "additive",
+          "conditions": [
+            { "rule": "rsiStructure", "params": { "timeframe": "1D", "period": 14, "type": "divergence" }, "points": 3, "label": "Price LL while RSI(14) HL" }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Support Confluence",
+      "maxPoints": 20,
+      "groups": [
+        {
+          "label": "Confluence Count at Bounce Level",
+          "pick": "tiered",
+          "conditions": [
+            { "rule": "supportConfluence", "params": { "timeframe": "1D", "emaPeriods": [50, 200], "atrPeriod": 14, "lookback": 60, "minFactors": 3 }, "points": 12, "label": "3+ factors confluent" },
+            { "rule": "supportConfluence", "params": { "timeframe": "1D", "emaPeriods": [50, 200], "atrPeriod": 14, "lookback": 60, "minFactors": 2 }, "points": 8,  "label": "2 factors confluent" },
+            { "rule": "supportConfluence", "params": { "timeframe": "1D", "emaPeriods": [50, 200], "atrPeriod": 14, "lookback": 60, "minFactors": 1 }, "points": 4,  "label": "Range floor only (≥1 factor)" }
+          ]
+        },
+        {
+          "label": "Distance from Range Floor",
+          "pick": "tiered",
+          "conditions": [
+            { "rule": "rangeFloorProximity", "params": { "timeframe": "1D", "lookback": 60, "atrPeriod": 14, "maxAtrMultiple": 0.25 }, "points": 8, "label": "Within 0.25× ATR" },
+            { "rule": "rangeFloorProximity", "params": { "timeframe": "1D", "lookback": 60, "atrPeriod": 14, "maxAtrMultiple": 0.5  }, "points": 5, "label": "Within 0.5× ATR" },
+            { "rule": "rangeFloorProximity", "params": { "timeframe": "1D", "lookback": 60, "atrPeriod": 14, "maxAtrMultiple": 1.0  }, "points": 2, "label": "Within 1× ATR" }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Reversal Candle Quality",
+      "maxPoints": 15,
+      "groups": [
+        {
+          "label": "Candle Type",
+          "pick": "tiered",
+          "conditions": [
+            { "rule": "bullishReversalCandle", "params": { "timeframe": "1D", "pattern": "engulfing_2plus" }, "points": 10, "label": "Bullish engulfing of prior 2+ red candles" },
+            { "rule": "bullishReversalCandle", "params": { "timeframe": "1D", "pattern": "hammer"           }, "points": 8,  "label": "Hammer (lower wick > 2× body)" },
+            { "rule": "bullishReversalCandle", "params": { "timeframe": "1D", "pattern": "pin_doji"         }, "points": 5,  "label": "Pin bar / doji at support" },
+            { "rule": "bullishReversalCandle", "params": { "timeframe": "1D", "pattern": "green_after_red"  }, "points": 3,  "label": "Simple green close after red sequence" }
+          ]
+        },
+        {
+          "label": "Volume on Reversal Bar",
+          "pick": "tiered",
+          "conditions": [
+            { "rule": "triggerVolume", "params": { "timeframe": "1D", "avgWindow": 20, "minPctAboveAvg": 100 },                        "points": 5, "label": ">2.0× avg" },
+            { "rule": "triggerVolume", "params": { "timeframe": "1D", "avgWindow": 20, "minPctAboveAvg": 50, "maxPctAboveAvg": 100 },  "points": 4, "label": "1.5–2.0× avg" },
+            { "rule": "triggerVolume", "params": { "timeframe": "1D", "avgWindow": 20, "minPctAboveAvg": 0,  "maxPctAboveAvg": 50  },  "points": 3, "label": "1.0–1.5× avg" }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "BB Position & Mean Distance",
+      "maxPoints": 10,
+      "groups": [
+        {
+          "label": "BB Position",
+          "pick": "tiered",
+          "conditions": [
+            { "rule": "bbLowerPosition", "params": { "timeframe": "1D", "period": 20, "stdDev": 2, "atrPeriod": 14, "quality": "pierced"    }, "points": 6, "label": "Pierced and closed back inside" },
+            { "rule": "bbLowerPosition", "params": { "timeframe": "1D", "period": 20, "stdDev": 2, "atrPeriod": 14, "quality": "tagged"     }, "points": 4, "label": "Tagged exactly" },
+            { "rule": "bbLowerPosition", "params": { "timeframe": "1D", "period": 20, "stdDev": 2, "atrPeriod": 14, "quality": "within_atr" }, "points": 2, "label": "Within 0.5× ATR of lower BB" }
+          ]
+        },
+        {
+          "label": "Distance from 60-Day Midpoint",
+          "pick": "tiered",
+          "conditions": [
+            { "rule": "rangeMidpointDistance", "params": { "timeframe": "1D", "lookback": 60, "atrPeriod": 14, "minPct": 10 },              "points": 4, "label": "≥10% below midpoint" },
+            { "rule": "rangeMidpointDistance", "params": { "timeframe": "1D", "lookback": 60, "atrPeriod": 14, "minPct": 5, "maxPct": 10 }, "points": 2, "label": "5–10% below midpoint" }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Manual Review",
+      "maxPoints": 0,
+      "groups": [
+        {
+          "label": "Discretionary checks",
+          "pick": "additive",
+          "conditions": [
+            { "rule": "manualReview", "params": { "label": "Major news event (earnings/guidance/downgrade/FDA/lawsuit)" }, "points": 0, "label": "News-event check" },
+            { "rule": "manualReview", "params": { "label": "Range breakdown in progress (close below prior 60d low)" },     "points": 0, "label": "Range-breakdown check" },
+            { "rule": "manualReview", "params": { "label": "Sector in clear breakdown (sector-wide weakness)" },             "points": 0, "label": "Sector-breakdown check" }
+          ]
+        }
+      ]
+    }
+  ]
+}

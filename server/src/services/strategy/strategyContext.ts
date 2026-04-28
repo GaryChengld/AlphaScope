@@ -1,18 +1,41 @@
-import { EMA, ATR, RSI } from 'technicalindicators';
+import { EMA, ATR, RSI, ADX, BollingerBands, MACD } from 'technicalindicators';
 import { getStockCandles, getLivePrices, OhlcvRow } from '../stockService';
 import { yf } from '../../lib/yf';
 
+export interface BollingerBandsSeries {
+  period: number;
+  stdDev: number;
+  upper:  number[];
+  middle: number[];
+  lower:  number[];
+}
+
+export interface MacdSeries {
+  fast:       number;
+  slow:       number;
+  signal:     number;
+  macd:       number[];
+  signalLine: number[];
+  histogram:  number[];
+}
+
 export interface TimeframeData {
   candles: OhlcvRow[];
-  ema: Record<number, number[]>;
-  atr: Record<number, number[]>;
-  rsi: Record<number, number[]>;
+  ema:  Record<number, number[]>;
+  atr:  Record<number, number[]>;
+  rsi:  Record<number, number[]>;
+  adx:  Record<number, number[]>;
+  bb:   BollingerBandsSeries[];
+  macd: MacdSeries[];
 }
 
 export interface IndicatorSpec {
-  ema?: number[];
-  atr?: number[];
-  rsi?: number[];
+  ema?:  number[];
+  atr?:  number[];
+  rsi?:  number[];
+  adx?:  number[];
+  bb?:   { period: number; stdDev: number }[];
+  macd?: { fast: number; slow: number; signal: number }[];
 }
 
 export interface IndicatorRequirements {
@@ -115,6 +138,9 @@ function buildTimeframeData(
   const ema: Record<number, number[]> = {};
   const atr: Record<number, number[]> = {};
   const rsi: Record<number, number[]> = {};
+  const adx: Record<number, number[]> = {};
+  const bb:   BollingerBandsSeries[] = [];
+  const macd: MacdSeries[] = [];
 
   for (const p of reqs.ema ?? []) {
     if (closes.length > p)
@@ -128,8 +154,46 @@ function buildTimeframeData(
     if (closes.length > p)
       rsi[p] = RSI.calculate({ period: p, values: closes });
   }
+  for (const p of reqs.adx ?? []) {
+    if (closes.length > p * 2) {
+      const out = ADX.calculate({ period: p, high: highs, low: lows, close: closes });
+      adx[p] = out.map((a: { adx: number }) => a.adx ?? NaN);
+    }
+  }
+  for (const spec of reqs.bb ?? []) {
+    if (closes.length > spec.period) {
+      const out = BollingerBands.calculate({ period: spec.period, stdDev: spec.stdDev, values: closes });
+      bb.push({
+        period: spec.period,
+        stdDev: spec.stdDev,
+        upper:  out.map(b => b.upper),
+        middle: out.map(b => b.middle),
+        lower:  out.map(b => b.lower),
+      });
+    }
+  }
+  for (const spec of reqs.macd ?? []) {
+    if (closes.length > spec.slow + spec.signal) {
+      const out = MACD.calculate({
+        fastPeriod:        spec.fast,
+        slowPeriod:        spec.slow,
+        signalPeriod:      spec.signal,
+        values:            closes,
+        SimpleMAOscillator: false,
+        SimpleMASignal:     false,
+      });
+      macd.push({
+        fast:       spec.fast,
+        slow:       spec.slow,
+        signal:     spec.signal,
+        macd:       out.map(m => m.MACD       ?? NaN),
+        signalLine: out.map(m => m.signal     ?? NaN),
+        histogram:  out.map(m => m.histogram  ?? NaN),
+      });
+    }
+  }
 
-  return { candles: cleanCandles, ema, atr, rsi };
+  return { candles: cleanCandles, ema, atr, rsi, adx, bb, macd };
 }
 
 export async function buildStrategyContext(

@@ -13,6 +13,8 @@ import { stockSearchRouter } from './routes/stockSearch';
 import { stockDetailRouter } from './routes/stockDetail';
 import { overviewRouter } from './routes/overview';
 import { strategyRouter } from './routes/strategyRoutes';
+import { scannerRouter, notificationRouter } from './routes/scannerRoutes';
+import { initScheduler } from './services/scannerScheduler';
 
 const app = express();
 const httpServer = createServer(app);
@@ -24,9 +26,12 @@ app.use('/api/watchlists/:id/stocks', watchlistStocksRouter);
 app.use('/api/stocks', stockSearchRouter);
 app.use('/api/stocks', stockDetailRouter);
 app.use('/api/overview', overviewRouter);
-app.use('/api/strategies', strategyRouter);
+app.use('/api/strategies',     strategyRouter);
+app.use('/api/scanner',        scannerRouter);
+app.use('/api/notifications',  notificationRouter);
 
 initSocket(httpServer);
+initScheduler();
 
 const PORT = process.env.PORT || 3001;
 httpServer.listen(PORT, () => {

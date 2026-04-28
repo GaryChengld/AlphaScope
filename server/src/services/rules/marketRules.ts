@@ -25,15 +25,19 @@ export function noNearEarnings(ctx: StrategyContext, params: Record<string, unkn
     return { pass: true, detail: 'No upcoming earnings date found' };
 
   const today    = new Date();
+  today.setHours(0, 0, 0, 0);
   const earnings = new Date(ctx.earningsDate);
-  const days     = businessDaysBetween(today, earnings);
+  earnings.setHours(0, 0, 0, 0);
 
   // Past earnings dates pass intentionally: a stock that just reported is no
   // longer at risk of an earnings surprise during the trade window — the gate
   // is "no earnings event coming up," not "had an earnings event recently."
-  if (days < 0)
+  // Note: businessDaysBetween returns 0 (not negative) when from > to, so we
+  // must compare dates directly before calling it.
+  if (earnings < today)
     return { pass: true, detail: `Earnings date ${ctx.earningsDate} is in the past` };
 
+  const days = businessDaysBetween(today, earnings);
   const pass = days > tradingDays;
   return {
     pass,

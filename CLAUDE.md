@@ -16,6 +16,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - **Market Data:** `yahoo-finance2` (on-demand 5-min OHLC + daily candles for SPX, SPY, and 11 sector ETFs)
 - **Indicators:** `technicalindicators` library (VWAP, SMA, RSI, ATR)
 - **Charts:** `lightweight-charts` v5 (SPX candlestick chart with VWAP, volume, RSI pane)
+- **Scheduler:** `node-cron` v3 (strategy scanner, fires at 10:00/12:00/14:00/16:00 ET on market days)
 
 ## Repository Structure
 
@@ -37,6 +38,7 @@ Routes are thin HTTP handlers only — they parse/validate request parameters an
 server/src/
   lib/
     dateUtils.ts        # subDate / today / tomorrow helpers
+    marketCalendar.ts   # isMarketDay() — NYSE holiday check (algorithmic, no hardcoded lists)
     prisma.ts           # Prisma client singleton
     yf.ts               # yahoo-finance2 singleton
   services/
@@ -44,6 +46,8 @@ server/src/
     newsService.ts      # getStockNews (Finnhub)
     stockSearchService.ts  # searchStocks
     watchlistService.ts # watchlist + stock CRUD (listWatchlists, createWatchlist, getStocksWithPrices, addStock, …)
+    scannerService.ts   # triggerScan() fire-and-forget + private runScan(); _scanning flag prevents concurrent runs; skips index tickers (^)
+    scannerScheduler.ts # initScheduler() — node-cron jobs at 10/12/14/16 ET; isMarketDay() + triggerScan() guards
     strategy/
       strategyContext.ts  # Concurrent fetcher + indicator pre-compute (cached SPY/sector ETFs)
       strategyEngine.ts   # Pure evaluator: ctx + def → StrategyResult JSON
@@ -62,8 +66,9 @@ server/src/
     watchlists.ts
     watchlistStocks.ts
     strategyRoutes.ts
+    scannerRoutes.ts    # scannerRouter (POST /run) + notificationRouter (GET, PATCH /:id/read, DELETE /:id)
   socket/
-    index.ts
+    index.ts            # initSocket() + getIo() singleton export
   index.ts
 ```
 
@@ -84,6 +89,26 @@ Strategies are declarative JSON in `specs/strategies/`. The engine has three lay
 **Endpoints:**
 - `GET /api/strategies` → `[{ id, name, version }]` (only enabled)
 - `GET /api/strategies/:strategyId/evaluate/:ticker` → `text/markdown` (200 success, 404 unknown/disabled, 502 evaluation failure)
+
+### Scanner & Notification System
+
+The scanner runs all enabled strategies against every stock and ETF in every watchlist (indices with `^` prefix are skipped) and persists results for stocks that pass all mandatory gates.
+
+**Data model:** One `Notification` per (strategyId, calendar-day); child `NotificationTicker` rows hold per-stock score + full markdown. Deduplication is enforced in the service layer — the same (ticker, strategy) pair is only recorded once per day.
+
+**`scannerService.ts`** exports `triggerScan()` — synchronous, fire-and-forget. Sets a module-level `_scanning` flag, starts `runScan()` as a detached promise, returns `true`. Returns `false` immediately (without starting a scan) if `_scanning` is already true. Both the HTTP route and the cron scheduler use `triggerScan()`, so they share the same in-progress guard.
+
+**`scannerScheduler.ts`** calls `initScheduler()` on server startup. Registers four `node-cron` jobs (10:00, 12:00, 14:00, 16:00 ET via `timezone: 'America/New_York'`). Each callback checks `isMarketDay()` before calling `triggerScan()`.
+
+**Socket event:** server emits `notification:update` with the full `Notification` (including all current `tickers[]`) each time a new ticker is added during a scan. The client upserts by id.
+
+**Endpoints:**
+- `POST /api/scanner/run` → `202 { message }` (scan started) or `409 { error }` (already running)
+- `GET /api/notifications` → `Notification[]` with nested `tickers[]`, last 90 days, newest first
+- `PATCH /api/notifications/:id/read` → marks read
+- `DELETE /api/notifications/:id` → deletes notification + tickers (cascade)
+
+**Frontend:** `Shell.tsx` owns notification state (fetch on mount + socket subscription). `Topbar.tsx` shows unread badge. `RightPanel.tsx` renders accordion cards — collapsed by default, one expanded at a time; "Run Scan" button; trash delete per card. Clicking a ticker navigates to `/stock/:ticker` with Router state `{ ticker, notificationMarkdown, strategyId }`; `StockDetail.tsx` reads this state and pre-populates the Strategy tab with the stored markdown (no re-evaluation).
 
 ### Sidebar Stock List Behaviour
 

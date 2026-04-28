@@ -1,0 +1,405 @@
+{
+  "id": "breakout_from_consolidation",
+  "name": "Breakout from Consolidation",
+  "version": "1.0",
+  "totalMaxPoints": 100,
+
+  "requires": {
+    "timeframes": {
+      "1D": {
+        "ema": [20, 50],
+        "atr": [14],
+        "rsi": [14],
+        "bb": [{ "period": 20, "stdDev": 2 }],
+        "macd": [{ "fast": 12, "slow": 26, "signal": 9 }]
+      }
+    },
+    "spy": { "ema": [50] }
+  },
+
+  "mandatory": [
+    {
+      "rule": "consolidationDetected",
+      "params": { "timeframe": "1D", "minDays": 10, "maxDays": 40, "minWidthPct": 2, "maxWidthPct": 10 },
+      "label": "Consolidation detected (10–40 days, width 2–10%)"
+    },
+    {
+      "rule": "priorTrendBeforeBase",
+      "params": { "timeframe": "1D", "lookbackDays": 60, "minGainPct": -5 },
+      "label": "Not in a sustained downtrend (≥−5% over 60 days before base)"
+    },
+    {
+      "rule": "breakoutConfirmed",
+      "params": { "timeframe": "1D" },
+      "label": "Close above consolidation high"
+    },
+    {
+      "rule": "breakoutNotExtended",
+      "params": { "timeframe": "1D", "maxExtensionPct": 5 },
+      "label": "Close within 5% of breakout level"
+    },
+    {
+      "rule": "triggerVolume",
+      "params": { "timeframe": "1D", "avgWindow": 20, "minPctAboveAvg": 30 },
+      "label": "Breakout volume ≥1.3× 20-day average"
+    },
+    {
+      "rule": "consolidationVolumeSane",
+      "params": { "timeframe": "1D", "avgWindow": 20, "maxRatio": 3.0 },
+      "label": "No volume spike >3× avg during consolidation"
+    },
+    {
+      "rule": "spyAboveEma",
+      "params": { "period": 50 },
+      "label": "SPY above 50-EMA (proxy for 50-SMA)"
+    },
+    {
+      "rule": "marketRegime",
+      "params": { "spyEmaPeriod": 50, "maxVix": 30 },
+      "label": "VIX < 30 (broad market not under pressure)"
+    },
+    {
+      "rule": "noNearEarnings",
+      "params": { "tradingDays": 5 },
+      "label": "No earnings within 5 trading days"
+    },
+    {
+      "rule": "liquidityFloor",
+      "params": { "timeframe": "1D", "avgWindow": 20, "minDollar": 5000000 },
+      "label": "20-day avg dollar volume ≥ $5M"
+    }
+  ],
+
+  "sections": [
+    {
+      "name": "Consolidation Quality",
+      "maxPoints": 25,
+      "groups": [
+        {
+          "label": "Range Width",
+          "pick": "tiered",
+          "conditions": [
+            {
+              "rule": "consolidationWidth",
+              "params": { "timeframe": "1D", "min": 2, "max": 5 },
+              "points": 12,
+              "label": "2–5%"
+            },
+            {
+              "rule": "consolidationWidth",
+              "params": { "timeframe": "1D", "min": 5, "max": 7 },
+              "points": 8,
+              "label": ">5–7%"
+            },
+            {
+              "rule": "consolidationWidth",
+              "params": { "timeframe": "1D", "min": 7, "max": 12 },
+              "points": 4,
+              "label": ">7–12%"
+            }
+          ]
+        },
+        {
+          "label": "Duration",
+          "pick": "tiered",
+          "conditions": [
+            {
+              "rule": "consolidationDuration",
+              "params": { "timeframe": "1D", "minDays": 25, "maxDays": 40 },
+              "points": 8,
+              "label": "25–40 days"
+            },
+            {
+              "rule": "consolidationDuration",
+              "params": { "timeframe": "1D", "minDays": 15, "maxDays": 24 },
+              "points": 5,
+              "label": "15–24 days"
+            },
+            {
+              "rule": "consolidationDuration",
+              "params": { "timeframe": "1D", "minDays": 10, "maxDays": 14 },
+              "points": 3,
+              "label": "10–14 days"
+            }
+          ]
+        },
+        {
+          "label": "BB Squeeze Strength",
+          "pick": "tiered",
+          "conditions": [
+            {
+              "rule": "bbSqueeze",
+              "params": { "timeframe": "1D", "lookback": 90, "maxPercentile": 0 },
+              "points": 5,
+              "label": "At 90-day low"
+            },
+            {
+              "rule": "bbSqueeze",
+              "params": { "timeframe": "1D", "lookback": 90, "maxPercentile": 10 },
+              "points": 3,
+              "label": "Lowest 10%"
+            },
+            {
+              "rule": "bbSqueeze",
+              "params": { "timeframe": "1D", "lookback": 90, "maxPercentile": 25 },
+              "points": 1,
+              "label": "Lowest 25%"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Breakout Quality",
+      "maxPoints": 30,
+      "groups": [
+        {
+          "label": "Volume",
+          "pick": "tiered",
+          "conditions": [
+            {
+              "rule": "triggerVolume",
+              "params": { "timeframe": "1D", "avgWindow": 20, "minPctAboveAvg": 150 },
+              "points": 15,
+              "label": ">2.5× avg"
+            },
+            {
+              "rule": "triggerVolume",
+              "params": { "timeframe": "1D", "avgWindow": 20, "minPctAboveAvg": 100, "maxPctAboveAvg": 150 },
+              "points": 12,
+              "label": "2.0–2.5× avg"
+            },
+            {
+              "rule": "triggerVolume",
+              "params": { "timeframe": "1D", "avgWindow": 20, "minPctAboveAvg": 50, "maxPctAboveAvg": 100 },
+              "points": 8,
+              "label": "1.5–2.0× avg"
+            }
+          ]
+        },
+        {
+          "label": "Close Strength",
+          "pick": "tiered",
+          "conditions": [
+            {
+              "rule": "breakoutCloseStrength",
+              "params": { "timeframe": "1D", "minRangePct": 0.9 },
+              "points": 10,
+              "label": "Top 10% of range"
+            },
+            {
+              "rule": "breakoutCloseStrength",
+              "params": { "timeframe": "1D", "minRangePct": 0.75 },
+              "points": 6,
+              "label": "Top 25% of range"
+            },
+            {
+              "rule": "breakoutCloseStrength",
+              "params": { "timeframe": "1D", "minRangePct": 0.5 },
+              "points": 3,
+              "label": "Top 50% of range"
+            }
+          ]
+        },
+        {
+          "label": "Candle Size",
+          "pick": "tiered",
+          "conditions": [
+            {
+              "rule": "breakoutCandleSize",
+              "params": { "timeframe": "1D", "atrPeriod": 14, "min": 1.5 },
+              "points": 5,
+              "label": ">1.5× ATR"
+            },
+            {
+              "rule": "breakoutCandleSize",
+              "params": { "timeframe": "1D", "atrPeriod": 14, "min": 0.8, "max": 1.5 },
+              "points": 3,
+              "label": "Normal (0.8–1.5× ATR)"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Prior Trend Context",
+      "maxPoints": 15,
+      "groups": [
+        {
+          "label": "Strength of Prior Uptrend",
+          "pick": "tiered",
+          "conditions": [
+            {
+              "rule": "priorTrendBeforeBase",
+              "params": { "timeframe": "1D", "lookbackDays": 28, "minGainPct": 15 },
+              "points": 8,
+              "label": "≥15% over 4+ weeks"
+            },
+            {
+              "rule": "priorTrendBeforeBase",
+              "params": { "timeframe": "1D", "lookbackDays": 14, "minGainPct": 8 },
+              "points": 5,
+              "label": "8–15% over 2–4 weeks"
+            },
+            {
+              "rule": "priorTrendBeforeBase",
+              "params": { "timeframe": "1D", "lookbackDays": 14, "minGainPct": 0 },
+              "points": 2,
+              "label": "<8% / choppy"
+            }
+          ]
+        },
+        {
+          "label": "Larger Structure",
+          "pick": "tiered",
+          "conditions": [
+            {
+              "rule": "largerStructurePosition",
+              "params": { "timeframe": "1D", "quality": "new_high" },
+              "points": 7,
+              "label": "52-week high or 6+ mo base"
+            },
+            {
+              "rule": "largerStructurePosition",
+              "params": { "timeframe": "1D", "quality": "intermediate_base" },
+              "points": 4,
+              "label": "Intermediate base (8–12w)"
+            },
+            {
+              "rule": "largerStructurePosition",
+              "params": { "timeframe": "1D", "quality": "below_resistance" },
+              "points": 1,
+              "label": "Below 6-month high"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Relative Strength vs SPY (60d)",
+      "maxPoints": 10,
+      "groups": [
+        {
+          "label": "RS ratio",
+          "pick": "tiered",
+          "conditions": [
+            {
+              "rule": "rsVsSpy",
+              "params": { "timeframe": "1D", "lookback": 60, "minRatio": 1.05 },
+              "points": 10,
+              "label": "Outperformed SPY ≥5%"
+            },
+            {
+              "rule": "rsVsSpy",
+              "params": { "timeframe": "1D", "lookback": 60, "minRatio": 1.0, "maxRatio": 1.05 },
+              "points": 6,
+              "label": "Outperformed SPY 0–5%"
+            },
+            {
+              "rule": "rsVsSpy",
+              "params": { "timeframe": "1D", "lookback": 60, "minRatio": 0.98, "maxRatio": 1.0 },
+              "points": 3,
+              "label": "Roughly matched SPY"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Momentum Confirmation",
+      "maxPoints": 10,
+      "groups": [
+        {
+          "label": "Momentum signals",
+          "pick": "additive",
+          "conditions": [
+            {
+              "rule": "macdBullishCrossAboveZero",
+              "params": { "timeframe": "1D", "lookbackBars": 5 },
+              "points": 5,
+              "label": "MACD bullish cross above zero (last 5 bars)"
+            },
+            {
+              "rule": "rsiLevel",
+              "params": { "timeframe": "1D", "period": 14, "min": 60, "max": 100 },
+              "points": 5,
+              "label": "RSI(14) > 60 on breakout"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Sector & Market Support",
+      "maxPoints": 10,
+      "groups": [
+        {
+          "label": "Sector",
+          "pick": "tiered",
+          "conditions": [
+            {
+              "rule": "sectorStrength",
+              "params": { "topN": 3 },
+              "points": 5,
+              "label": "Sector ETF top-3 (proxy for breaking out)"
+            },
+            {
+              "rule": "sectorStrength",
+              "params": { "topN": 7 },
+              "points": 3,
+              "label": "Sector ETF top-7 (proxy for mild uptrend)"
+            }
+          ]
+        },
+        {
+          "label": "Volatility Regime",
+          "pick": "tiered",
+          "conditions": [
+            {
+              "rule": "marketRegime",
+              "params": { "spyEmaPeriod": 50, "maxVix": 18 },
+              "points": 5,
+              "label": "VIX < 18"
+            },
+            {
+              "rule": "marketRegime",
+              "params": { "spyEmaPeriod": 50, "maxVix": 22 },
+              "points": 3,
+              "label": "VIX 18–22"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Manual Review",
+      "maxPoints": 0,
+      "groups": [
+        {
+          "label": "Discretionary checks",
+          "pick": "additive",
+          "conditions": [
+            {
+              "rule": "manualReview",
+              "params": { "label": "Breaking into major resistance" },
+              "points": 0,
+              "label": "Major resistance check"
+            },
+            {
+              "rule": "manualReview",
+              "params": { "label": "News-driven move (earnings/M&A/FDA/upgrade)" },
+              "points": 0,
+              "label": "News-spike check"
+            },
+            {
+              "rule": "manualReview",
+              "params": { "label": "Breakout volume erratic vs steadily rising" },
+              "points": 0,
+              "label": "Volume quality check"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

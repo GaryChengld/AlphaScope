@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, useLocation } from 'react-router-dom';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import TradingViewChart from '../components/TradingViewChart';
@@ -398,6 +398,7 @@ function AnalysisPanel({ analysis, loading, currentPrice }: {
 
 export default function StockDetail() {
   const { ticker } = useParams<{ ticker: string }>();
+  const location = useLocation();
   const [summary, setSummary] = useState<Summary | null>(null);
   const [news, setNews] = useState<NewsItem[]>([]);
   const [analysis, setAnalysis] = useState<StockAnalysis | null>(null);
@@ -439,6 +440,19 @@ export default function StockDetail() {
     const timer = setInterval(fetchSummary, 30_000);
     return () => clearInterval(timer);
   }, [ticker]);
+
+  // Pre-populate strategy tab when navigated from a notification link
+  useEffect(() => {
+    const state = location.state as {
+      ticker?: string;
+      notificationMarkdown?: string;
+      strategyId?: string;
+    } | null;
+    if (!state?.notificationMarkdown || state.ticker !== ticker) return;
+    setTab('strategy');
+    setSelectedStrategyId(state.strategyId ?? '');
+    setStrategyMarkdown(state.notificationMarkdown);
+  }, [location.state, ticker]);
 
   if (!ticker) return null;
 

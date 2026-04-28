@@ -12,5 +12,19 @@
     "version": "2.0",
     "file":    "multi_timeframe_pullback_v2.json",
     "enabled": true
+  },
+  {
+    "id":      "breakout_from_consolidation",
+    "name":    "Breakout from Consolidation",
+    "version": "1.0",
+    "file":    "breakout_from_consolidation_v1.json",
+    "enabled": true
+  },
+  {
+    "id":      "rsi_mean_reversion",
+    "name":    "RSI Mean Reversion (Range-Bound)",
+    "version": "1.0",
+    "file":    "rsi_mean_reversion_v1.json",
+    "enabled": true
   }
 ]

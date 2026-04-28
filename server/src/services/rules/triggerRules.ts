@@ -1,6 +1,6 @@
 import { StrategyContext } from '../strategy/strategyContext';
 import { RuleResult } from './types';
-import { last, paramNum, paramStr, paramArr } from './helpers';
+import { last, paramNum, paramNumOpt, paramStr, paramArr } from './helpers';
 
 // ─── Rules ───────────────────────────────────────────────────────────────────
 
@@ -46,11 +46,14 @@ export function hourlyStructureBreak(ctx: StrategyContext, params: Record<string
   };
 }
 
-// Detects a bullish engulfing OR a hammer/pin bar on the most recent candle of
-// the given timeframe. Name reflects that it covers multiple reversal patterns,
-// not just engulfing.
+type ReversalPattern = 'any' | 'engulfing_2plus' | 'hammer' | 'pin_doji' | 'green_after_red';
+
+// Detects bullish reversal patterns on the most recent candle of the given timeframe.
+// When `pattern` is omitted or 'any', all four patterns are accepted (broadest gate).
+// Named patterns score individual types for tiered sections.
 export function bullishReversalCandle(ctx: StrategyContext, params: Record<string, unknown>): RuleResult {
   const timeframe = paramStr(params, 'timeframe', '1H');
+  const pattern   = (params.pattern as ReversalPattern | undefined) ?? 'any';
   const tf        = ctx.timeframes[timeframe];
   if (!tf || tf.candles.length < 2)
     return { pass: false, detail: `Insufficient ${timeframe} data` };
@@ -59,32 +62,61 @@ export function bullishReversalCandle(ctx: StrategyContext, params: Record<strin
   const curr    = candles[candles.length - 1];
   const prev    = candles[candles.length - 2];
 
+  const body      = Math.abs(curr.close - curr.open);
+  const lowerWick = Math.min(curr.open, curr.close) - curr.low;
+  const barRange  = curr.high - curr.low;
+
   const isBullishEngulfing = curr.close > curr.open &&
     prev.close < prev.open &&
     curr.open  <= prev.close &&
     curr.close >= prev.open;
 
-  const body      = Math.abs(curr.close - curr.open);
-  const lowerWick = Math.min(curr.open, curr.close) - curr.low;
-  const barRange  = curr.high - curr.low;
-  const isHammer  = body > 0 && lowerWick >= 2 * body &&
-    (curr.close - curr.low) / (barRange || 1) >= 0.75;
+  // Count consecutive red bars preceding the current bar
+  let redCount = 0;
+  for (let i = candles.length - 2; i >= 0; i--) {
+    if (candles[i].close < candles[i].open) redCount++;
+    else break;
+  }
 
-  const pass = isBullishEngulfing || isHammer;
-  return {
-    pass,
-    detail: isBullishEngulfing
-      ? `${timeframe} bullish engulfing: prev O$${prev.open.toFixed(2)} C$${prev.close.toFixed(2)}, curr O$${curr.open.toFixed(2)} C$${curr.close.toFixed(2)}`
-      : isHammer
-        ? `${timeframe} hammer/pin bar: lower wick ${lowerWick.toFixed(2)} vs body ${body.toFixed(2)}`
-        : `No engulfing or hammer on ${timeframe}`,
-  };
+  const isEngulfing2Plus = isBullishEngulfing && redCount >= 2;
+  const isHammer         = body > 0 && lowerWick >= 2 * body &&
+    (curr.close - curr.low) / (barRange || 1) >= 0.75;
+  const isPinOrDoji      = barRange > 0 &&
+    Math.abs(curr.close - curr.open) <= 0.3 * barRange &&
+    lowerWick >= 0.6 * barRange;
+  const isGreenAfterRed  = curr.close > curr.open && redCount >= 2 &&
+    !isBullishEngulfing && !isHammer;
+
+  let pass = false;
+  let detail = '';
+
+  if (pattern === 'any') {
+    pass = isBullishEngulfing || isHammer || isPinOrDoji || (curr.close > curr.open && redCount >= 2);
+    detail = pass
+      ? `${timeframe} reversal: engulfing=${isBullishEngulfing} hammer=${isHammer} pin=${isPinOrDoji} redCount=${redCount}`
+      : `No reversal pattern on ${timeframe}`;
+  } else if (pattern === 'engulfing_2plus') {
+    pass   = isEngulfing2Plus;
+    detail = `${timeframe} engulfing of ${redCount} red bar(s): O$${curr.open.toFixed(2)} C$${curr.close.toFixed(2)}`;
+  } else if (pattern === 'hammer') {
+    pass   = isHammer;
+    detail = `${timeframe} hammer: lower wick ${lowerWick.toFixed(2)} vs body ${body.toFixed(2)}`;
+  } else if (pattern === 'pin_doji') {
+    pass   = isPinOrDoji;
+    detail = `${timeframe} pin/doji: body ${body.toFixed(2)} vs range ${barRange.toFixed(2)}, lower wick ${lowerWick.toFixed(2)}`;
+  } else if (pattern === 'green_after_red') {
+    pass   = isGreenAfterRed;
+    detail = `${timeframe} green close after ${redCount} red bar(s)`;
+  }
+
+  return { pass, detail };
 }
 
 export function triggerVolume(ctx: StrategyContext, params: Record<string, unknown>): RuleResult {
   const timeframe      = paramStr(params, 'timeframe', '1H');
   const avgWindow      = paramNum(params, 'avgWindow', 20);
   const minPctAboveAvg = paramNum(params, 'minPctAboveAvg');
+  const maxPctAboveAvg = paramNumOpt(params, 'maxPctAboveAvg');
   const tf             = ctx.timeframes[timeframe];
   if (!tf || tf.candles.length < avgWindow + 1)
     return { pass: false, detail: `Insufficient ${timeframe} data` };
@@ -95,7 +127,7 @@ export function triggerVolume(ctx: StrategyContext, params: Record<string, unkno
   if (avgVol === 0) return { pass: false, detail: 'Zero average volume' };
 
   const pctAbove = (lastVol / avgVol - 1) * 100;
-  const pass     = pctAbove >= minPctAboveAvg;
+  const pass     = pctAbove >= minPctAboveAvg && (maxPctAboveAvg == null || pctAbove < maxPctAboveAvg);
   return {
     pass,
     detail: `${timeframe} trigger bar volume ${pctAbove >= 0 ? '+' : ''}${pctAbove.toFixed(0)}% vs ${avgWindow}-bar avg`,

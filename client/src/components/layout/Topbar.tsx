@@ -5,6 +5,7 @@ import { Search, Bell, Settings } from 'lucide-react';
 interface TopbarProps {
   onBellClick: () => void;
   onSearchClick: () => void;
+  unreadCount?: number;
 }
 
 function useMarketClock() {
@@ -47,7 +48,7 @@ const STATUS_COLOR: Record<string, string> = {
   CLOSED: 'text-gray-500',
 };
 
-export default function Topbar({ onBellClick, onSearchClick }: TopbarProps) {
+export default function Topbar({ onBellClick, onSearchClick, unreadCount }: TopbarProps) {
   const { time, status } = useMarketClock();
 
   return (
@@ -86,6 +87,11 @@ export default function Topbar({ onBellClick, onSearchClick }: TopbarProps) {
         aria-label="Notifications"
       >
         <Bell size={16} />
+        {(unreadCount ?? 0) > 0 && (
+          <span className="absolute -top-0.5 -right-0.5 bg-blue-500 text-white text-[9px] font-bold min-w-[14px] h-[14px] flex items-center justify-center rounded-full px-0.5 leading-none">
+            {unreadCount! > 99 ? '99+' : unreadCount}
+          </span>
+        )}
       </button>
 
       {/* Settings */}

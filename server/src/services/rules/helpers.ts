@@ -43,6 +43,50 @@ export function priorSwingHigh(candles: OhlcvRow[], lookback: number): number | 
   return Math.max(...candles.slice(-lookback * 2, -lookback).map(c => c.high));
 }
 
+// ─── Consolidation detection ────────────────────────────────────────────────
+// Searches the most recent N bars (excluding the current bar) for a sideways
+// window of length minDays..maxDays whose width = (high − low) / breakoutLevel
+// is ≤ maxWidthPct. Returns the longest qualifying window, anchored to end at
+// the bar just before the current one. Used by all consolidation-aware rules.
+
+export interface Consolidation {
+  startIdx:    number;   // index in candles[] where the window starts (inclusive)
+  endIdx:      number;   // index where it ends (inclusive — bar before current)
+  high:        number;
+  low:         number;
+  widthPct:    number;
+  durationDays: number;
+}
+
+export function detectConsolidation(
+  candles: OhlcvRow[],
+  minDays: number,
+  maxDays: number,
+  maxWidthPct: number,
+): Consolidation | null {
+  if (candles.length < minDays + 1) return null;
+
+  // The "current bar" is the last candle (the potential breakout bar). The
+  // consolidation window ends one bar before that.
+  const endIdx = candles.length - 2;
+  if (endIdx < minDays - 1) return null;
+
+  // Try the longest window first (favours rich bases over barely-sideways ones).
+  const limit = Math.min(maxDays, endIdx + 1);
+  for (let len = limit; len >= minDays; len--) {
+    const startIdx = endIdx - len + 1;
+    const slice    = candles.slice(startIdx, endIdx + 1);
+    const high     = Math.max(...slice.map(c => c.high));
+    const low      = Math.min(...slice.map(c => c.low));
+    if (high <= 0) continue;
+    const widthPct = ((high - low) / high) * 100;
+    if (widthPct <= maxWidthPct) {
+      return { startIdx, endIdx, high, low, widthPct, durationDays: len };
+    }
+  }
+  return null;
+}
+
 // Price-scaled "round number" — for a $30 stock, $5 increments are psychologically
 // significant; for a $300 stock, $25 increments are. Returns the nearest round
 // price using the appropriate grid for the price band.
@@ -50,6 +94,57 @@ export function nearestRoundNumber(close: number): { value: number; distance: nu
   const grid = close < 50 ? 5 : close <= 200 ? 10 : 25;
   const value = Math.round(close / grid) * grid;
   return { value, distance: Math.abs(close - value) };
+}
+
+// ─── 60-day range stats ──────────────────────────────────────────────────────
+// Fixed-window range helper for mean-reversion strategies. Unlike detectConsolidation
+// (which auto-sizes the window), this always uses the last `lookback` bars.
+
+export interface RangeStats {
+  high:                 number;
+  low:                  number;
+  midpoint:             number;
+  widthAtr:             number;
+  upperTouches:         number;
+  lowerTouches:         number;
+  durationDays:         number;
+  weeksSinceFirstTouch: number;
+}
+
+export function compute60dRangeStats(
+  candles: OhlcvRow[],
+  atrLast: number | undefined,
+  lookback = 60,
+  tolerance = 0.02,
+): RangeStats | null {
+  if (candles.length < lookback || atrLast == null || atrLast <= 0) return null;
+  const slice = candles.slice(-lookback);
+  const high  = Math.max(...slice.map(c => c.high));
+  const low   = Math.min(...slice.map(c => c.low));
+  if (high <= 0) return null;
+
+  const upperBand = high * (1 - tolerance);
+  const lowerBand = low  * (1 + tolerance);
+  let upperTouches = 0, lowerTouches = 0, firstTouchIdx = -1;
+  slice.forEach((c, i) => {
+    const upperHit = c.high >= upperBand;
+    const lowerHit = c.low  <= lowerBand;
+    if (upperHit) upperTouches++;
+    if (lowerHit) lowerTouches++;
+    if ((upperHit || lowerHit) && firstTouchIdx === -1) firstTouchIdx = i;
+  });
+
+  const barsSinceFirst      = firstTouchIdx >= 0 ? lookback - firstTouchIdx : 0;
+  const weeksSinceFirstTouch = barsSinceFirst / 5;
+
+  return {
+    high, low,
+    midpoint: (high + low) / 2,
+    widthAtr: (high - low) / atrLast,
+    upperTouches, lowerTouches,
+    durationDays: lookback,
+    weeksSinceFirstTouch,
+  };
 }
 
 // ─── Param-typing helpers ────────────────────────────────────────────────────
