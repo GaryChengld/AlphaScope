@@ -37,3 +37,10 @@ const PORT = process.env.PORT || 3001;
 httpServer.listen(PORT, () => {
   console.log(`[server] Alpha Scope server running on http://localhost:${PORT}`);
 });
+
+function shutdown() {
+  httpServer.closeAllConnections();
+  httpServer.close(() => process.exit(0));
+}
+process.on('SIGTERM', shutdown);
+process.on('SIGINT',  shutdown);

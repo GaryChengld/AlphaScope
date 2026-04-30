@@ -18,10 +18,17 @@ export function isScanRunning(): boolean {
 export function triggerScan(): boolean {
   if (_scanning) return false;
   _scanning = true;
+  getIo().emit('scanner:started');
   runScan()
-    .then(summary => console.log('[scanner] scan complete:', summary))
-    .catch(err    => console.error('[scanner] scan error:', err))
-    .finally(()   => { _scanning = false; });
+    .then(summary => {
+      console.log('[scanner] scan complete:', summary);
+      getIo().emit('scanner:complete', summary);
+    })
+    .catch(err => {
+      console.error('[scanner] scan error:', err);
+      getIo().emit('scanner:complete', { created: 0, skipped: 0, errors: 1 });
+    })
+    .finally(() => { _scanning = false; });
   return true;
 }
 
@@ -67,6 +74,7 @@ async function runScan(): Promise<ScanSummary> {
       } catch {
         errors++;
       }
+      await new Promise(r => setTimeout(r, 800));
     }
   }
 

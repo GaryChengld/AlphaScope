@@ -26,6 +26,7 @@ interface RightPanelProps {
   notifications: Notification[];
   onMarkRead: (id: number) => void;
   onDelete: (id: number) => void;
+  scanRunning: boolean;
 }
 
 function relativeTime(iso: string): string {
@@ -38,9 +39,8 @@ function relativeTime(iso: string): string {
   return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 }
 
-export default function RightPanel({ open, onClose, notifications, onMarkRead, onDelete }: RightPanelProps) {
+export default function RightPanel({ open, onClose, notifications, onMarkRead, onDelete, scanRunning }: RightPanelProps) {
   const navigate = useNavigate();
-  const [scanLoading, setScanLoading] = useState(false);
   const [expandedId, setExpandedId] = useState<number | null>(null);
 
   const unreadCount = notifications.filter(n => !n.read).length;
@@ -48,10 +48,8 @@ export default function RightPanel({ open, onClose, notifications, onMarkRead, o
   const toggleExpand = (id: number) =>
     setExpandedId(prev => (prev === id ? null : id));
 
-  const handleRunScan = async () => {
-    setScanLoading(true);
-    await fetch('/api/scanner/run', { method: 'POST' }).catch(() => {});
-    setScanLoading(false);
+  const handleRunScan = () => {
+    fetch('/api/scanner/run', { method: 'POST' }).catch(() => {});
   };
 
   return (
@@ -73,13 +71,18 @@ export default function RightPanel({ open, onClose, notifications, onMarkRead, o
               )}
             </span>
             <div className="flex items-center gap-2">
-              <button
-                onClick={handleRunScan}
-                disabled={scanLoading}
-                className="text-[10px] text-blue-400 hover:text-blue-300 disabled:text-gray-600 transition-colors"
-              >
-                {scanLoading ? 'Scanning…' : 'Run Scan'}
-              </button>
+              {scanRunning ? (
+                <span className="text-[10px] text-yellow-400 animate-pulse">
+                  Scanning in progress…
+                </span>
+              ) : (
+                <button
+                  onClick={handleRunScan}
+                  className="text-[10px] text-blue-400 hover:text-blue-300 transition-colors"
+                >
+                  Run Scan
+                </button>
+              )}
               <button
                 onClick={onClose}
                 className="p-1 rounded hover:bg-gray-800 text-gray-600 hover:text-gray-300 transition-colors"

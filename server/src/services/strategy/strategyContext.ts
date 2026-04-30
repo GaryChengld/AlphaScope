@@ -225,6 +225,8 @@ export async function buildStrategyContext(
   const timeframes: Record<string, TimeframeData> = {};
   tfKeys.forEach((tf, i) => {
     const r = candleResults[i];
+    if (r.status === 'rejected')
+      console.warn(`[ctx] ${ticker} ${tf} candles failed:`, (r.reason as Error)?.message ?? r.reason);
     timeframes[tf] = buildTimeframeData(
       r.status === 'fulfilled' ? r.value : [],
       requires.timeframes[tf],
@@ -232,14 +234,20 @@ export async function buildStrategyContext(
   });
 
   const spyCandles: OhlcvRow[] = spyResult[0].status === 'fulfilled' ? spyResult[0].value : [];
+  if (spyResult[0].status === 'rejected')
+    console.warn('[ctx] SPY candles failed:', (spyResult[0].reason as Error)?.message ?? spyResult[0].reason);
   const spy = buildTimeframeData(spyCandles, requires.spy ?? { ema: [200] });
 
   const vixPrices: Record<string, { price: number | null }> =
     vixResult[0].status === 'fulfilled' ? vixResult[0].value : {};
+  if (vixResult[0].status === 'rejected')
+    console.warn('[ctx] VIX fetch failed:', (vixResult[0].reason as Error)?.message ?? vixResult[0].reason);
   const vix = vixPrices['^VIX']?.price ?? null;
 
   const summary: QuoteSummary | null =
     summaryResult[0].status === 'fulfilled' ? summaryResult[0].value : null;
+  if (summaryResult[0].status === 'rejected')
+    console.warn(`[ctx] ${ticker} quoteSummary failed:`, (summaryResult[0].reason as Error)?.message ?? summaryResult[0].reason);
 
   const sectorReturns: Record<string, number> =
     sectorResult[0].status === 'fulfilled' ? sectorResult[0].value : {};

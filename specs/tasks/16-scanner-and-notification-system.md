@@ -103,8 +103,12 @@ npm install node-cron
 | Event | Direction | Payload | When |
 |-------|-----------|---------|------|
 | `notification:update` | Server → Client | Full `Notification` with `tickers[]` ordered by score desc | Every time a new ticker is added to a notification during a scan |
+| `scanner:started` | Server → Client | _(no payload)_ | When `triggerScan()` starts a new scan (manual or scheduled) |
+| `scanner:complete` | Server → Client | `ScanSummary { created, skipped, errors }` | When the scan finishes (success or error) |
 
-Client upsert logic: if a notification with the same `id` exists in local state, replace it; otherwise prepend it. This means clients see tickers added incrementally in real time as the scan progresses.
+`notification:update` upsert logic: replace existing record by `id` or prepend if new — clients see tickers added incrementally in real time.
+
+`scanner:started` / `scanner:complete` drive the `scanRunning` boolean in Shell, which is passed to RightPanel to control the scan button vs label.
 
 ---
 
@@ -122,10 +126,12 @@ Client upsert logic: if a notification with the same `id` exists in local state,
 
 ### Shell.tsx
 - Fetches `GET /api/notifications` on mount; populates `notifications` state
-- Connects socket on mount; listens for `notification:update`; disconnects on unmount
+- Connects socket on mount; listens for `notification:update`, `scanner:started`, `scanner:complete`; disconnects on unmount
+- `scanRunning` state: set `true` on `scanner:started`, `false` on `scanner:complete` — reflects both manual and scheduled scans
 - `markAsRead(id)` optimistically updates local state then calls `PATCH /api/notifications/:id/read`
 - `deleteNotification(id)` optimistically removes from local state then calls `DELETE /api/notifications/:id`
 - Derives `unreadCount = notifications.filter(n => !n.read).length`
+- Passes `scanRunning` to RightPanel
 
 ### StockDetail.tsx
 - Imports `useLocation` from `react-router-dom`
@@ -143,7 +149,7 @@ Client upsert logic: if a notification with the same `id` exists in local state,
 - **Read card**: `border-gray-800 bg-gray-950`, muted text, no dot
 - Each expanded card lists tickers with score; clicking a ticker calls `onMarkRead(n.id)` then navigates to `/stock/:ticker` with React Router `state` carrying `{ ticker, notificationMarkdown, strategyId }` — StockDetail reads this state and pre-populates the strategy tab
 - **Delete button** (`Trash2` icon, 11px) in each card header, right of timestamp; `e.stopPropagation()` prevents accordion toggle; hover turns red; calls `onDelete(n.id)` which removes the card immediately (optimistic) and fires `DELETE /api/notifications/:id`
-- **Run Scan button** in section header: calls `POST /api/scanner/run`; shows "Scanning…" while in flight (`scanLoading` local state); server returns 202 immediately (fire-and-forget)
+- **Scan status in header**: when `scanRunning=false` shows a "Run Scan" button (calls `POST /api/scanner/run`, fire-and-forget, no local loading state); when `scanRunning=true` replaces the button with a pulsing yellow "Scanning in progress…" label — reflects both user-triggered and scheduler-triggered scans via socket events
 - **Empty state**: "No notifications — click 'Run Scan' to find setups"
 - **Relative timestamps** via `relativeTime(iso)`: "just now" / "Nm ago" / "Nh ago" / "Mon D"
 - AI Analysis section retained as placeholder (unchanged)

@@ -7,6 +7,7 @@ import * as market     from './marketRules';
 import * as breakout   from './breakoutRules';
 import * as range      from './rangeRules';
 import * as meanRev    from './meanReversionRules';
+import * as abc        from './abcRules';
 
 export type RuleFn = (ctx: StrategyContext, params: Record<string, unknown>) => RuleResult;
 
@@ -73,4 +74,16 @@ export const RULES: Record<string, RuleFn> = {
   bbLowerPosition:         meanRev.bbLowerPosition,
   consecutiveRedBars:      meanRev.consecutiveRedBars,
   marketNotPanic:          meanRev.marketNotPanic,
+  // ABC Pullback Continuation
+  abcFibRetracement:       abc.abcFibRetracement,
+  abcHHHL:                 abc.abcHHHL,
+  abcImpulse:              abc.abcImpulse,
+  abcStructure:            abc.abcStructure,
+  abcNearSupport:          abc.abcNearSupport,
+  abcNoDivergence:         abc.abcNoDivergence,
+  abcImpulseQuality:       abc.abcImpulseQuality,
+  abcCPointWick:           abc.abcCPointWick,
+  abcPullbackBodyRatio:    abc.abcPullbackBodyRatio,
+  abcDaysSinceC:           abc.abcDaysSinceC,
+  abcMomentum:             abc.abcMomentum,
 };

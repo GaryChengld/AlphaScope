@@ -28,6 +28,7 @@ export default function Shell() {
   const [rightPanelOpen, setRightPanelOpen] = useState(true);
   const [searchOpen, setSearchOpen] = useState(false);
   const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [scanRunning, setScanRunning] = useState(false);
 
   useEffect(() => {
     fetch('/api/notifications')
@@ -49,8 +50,12 @@ export default function Shell() {
         return [updated, ...prev];
       });
     });
+    socket.on('scanner:started',  () => setScanRunning(true));
+    socket.on('scanner:complete', () => setScanRunning(false));
     return () => {
       socket.off('notification:update');
+      socket.off('scanner:started');
+      socket.off('scanner:complete');
       socket.disconnect();
     };
   }, []);
@@ -86,6 +91,7 @@ export default function Shell() {
             notifications={notifications}
             onMarkRead={markAsRead}
             onDelete={deleteNotification}
+            scanRunning={scanRunning}
           />
         </div>
       </div>

@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { Link } from 'react-router-dom';
 import IndexChart from '../components/IndexChart';
 
 interface MarketIndicator {
@@ -337,7 +338,11 @@ function EarningsTable({ events }: { events: EarningsEvent[] | null }) {
           return (
             <tr key={`${ev.date}-${ev.ticker}`} className={`border-b border-gray-800 ${i % 2 === 0 ? 'bg-gray-900/50' : ''}`}>
               <td className="text-xs text-gray-300 py-1.5 pl-3 pr-3 whitespace-nowrap">{ev.date}</td>
-              <td className="text-xs text-gray-300 py-1.5 pr-3 font-medium">{ev.ticker}</td>
+              <td className="text-xs py-1.5 pr-3 font-medium">
+                <Link to={`/stock/${ev.ticker}`} className="text-blue-400 hover:text-blue-300 transition-colors">
+                  {ev.ticker}
+                </Link>
+              </td>
               <td className="text-xs text-gray-300 py-1.5 pr-3 truncate max-w-[120px]">{ev.shortName ?? '—'}</td>
               <td className="text-xs text-gray-300 py-1.5 pr-3 text-right tabular-nums">
                 {ev.epsEstimate !== null ? ev.epsEstimate.toFixed(2) : '—'}

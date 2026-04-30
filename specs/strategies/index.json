@@ -26,5 +26,12 @@
     "version": "1.0",
     "file":    "rsi_mean_reversion_v1.json",
     "enabled": true
+  },
+  {
+    "id":      "abc_pullback_continuation",
+    "name":    "ABC Pullback Continuation",
+    "version": "1.0",
+    "file":    "abc_pullback_continuation_v1.json",
+    "enabled": true
   }
 ]

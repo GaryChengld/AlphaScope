@@ -31,7 +31,19 @@
       "Bash(curl -s -w \"\\\\n%{http_code}\" http://localhost:3001/api/strategies/multi_timeframe_pullback/evaluate/XXXXXX)",
       "Bash(curl *)",
       "Bash(git mv *)",
-      "Bash(time curl *)"
+      "Bash(time curl *)",
+      "Bash(npx ts-node *)",
+      "Bash(npx esbuild *)",
+      "PowerShell($s = Get-Content \"C:\\\\Workspaces\\\\AlphaScope\\\\specs\\\\strategies\\\\abc_pullback_continuation_v1.json\" | ConvertFrom-Json; $sum = \\($s.sections | ForEach-Object { $_.maxPoints } | Measure-Object -Sum\\).Sum; Write-Output \"Section sum: $sum\"; Write-Output \"Mandatory: $\\($s.mandatory.Count\\)\"; $rules = $s.sections | ForEach-Object { $_.groups } | ForEach-Object { $_.conditions } | ForEach-Object { $_.rule } | Select-Object -Unique; Write-Output \"Rules: $\\($rules -join ', '\\)\")",
+      "PowerShell(Get-NetTCPConnection *)",
+      "PowerShell(netstat *)",
+      "PowerShell(taskkill *)",
+      "PowerShell(Get-Process | Where-Object { $_.Id -eq 54436 })",
+      "PowerShell(Stop-Process *)",
+      "Bash(netstat -ano)",
+      "Bash(grep -v \"^.*:.*//.*console\")",
+      "Bash(grep -v \"^.*:.*//.*\")",
+      "Bash(python3 -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\(d.get\\('main',''\\), d.get\\('module',''\\), d.get\\('exports',''\\)\\)\")"
     ]
   }
 }

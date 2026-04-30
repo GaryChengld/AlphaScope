@@ -4,7 +4,7 @@
   "private": true,
   "main": "dist/index.js",
   "scripts": {
-    "dev": "tsx watch src/index.ts",
+    "dev": "nodemon --exec \"tsx src/index.ts\" --ext ts,json --watch src",
     "build": "tsc --project tsconfig.json",
     "start": "node dist/index.js",
     "db:generate": "prisma generate",
@@ -31,6 +31,7 @@
     "@types/express": "^5.0.6",
     "@types/node": "^25.5.0",
     "@types/node-cron": "^3.0.11",
+    "nodemon": "^3.1.14",
     "prisma": "^7.5.0",
     "shx": "^0.4.0",
     "tsx": "^4.21.0",
