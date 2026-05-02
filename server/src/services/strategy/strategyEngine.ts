@@ -22,7 +22,7 @@ export interface SectionDef {
   maxPoints:  number;
   cap?:       number;
   note?:      string;
-  dependsOn?: { sections: number[]; minTotal: number };
+  dependsOn?: { sections: number[]; minTotal?: number; multiplier?: { divisor: number } };
   groups:     GroupDef[];
 }
 
@@ -150,20 +150,26 @@ export function evaluateStrategy(ctx: StrategyContext, strategy: StrategyDefinit
   for (let i = 0; i < strategy.sections.length; i++) {
     const section = strategy.sections[i];
     const dep = section.dependsOn;
+    let multiplier = 1;
+
     if (dep) {
       const upstreamTotal = dep.sections.reduce((sum, idx1) => {
         const prior = sections[idx1 - 1];
         return sum + (prior?.score ?? 0);
       }, 0);
-      if (upstreamTotal < dep.minTotal) {
+      if (dep.minTotal != null && upstreamTotal < dep.minTotal) {
         sections.push({ name: section.name, maxPoints: section.maxPoints, score: 0, groups: [] });
         continue;
+      }
+      if (dep.multiplier) {
+        multiplier = Math.min(1, upstreamTotal / dep.multiplier.divisor);
       }
     }
 
     const groups   = section.groups.map(g => evaluateGroup(g, ctx));
     const rawScore = groups.reduce((s, g) => s + g.score, 0);
-    const score    = section.cap != null ? Math.min(rawScore, section.cap) : rawScore;
+    const capped   = section.cap != null ? Math.min(rawScore, section.cap) : rawScore;
+    const score    = Math.round(capped * multiplier);
     sections.push({ name: section.name, maxPoints: section.maxPoints, score, groups });
   }
 

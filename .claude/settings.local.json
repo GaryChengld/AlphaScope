@@ -43,7 +43,9 @@
       "Bash(netstat -ano)",
       "Bash(grep -v \"^.*:.*//.*console\")",
       "Bash(grep -v \"^.*:.*//.*\")",
-      "Bash(python3 -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\(d.get\\('main',''\\), d.get\\('module',''\\), d.get\\('exports',''\\)\\)\")"
+      "Bash(python3 -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\(d.get\\('main',''\\), d.get\\('module',''\\), d.get\\('exports',''\\)\\)\")",
+      "Bash(node -e ' *)",
+      "Bash(node --import tsx/esm -e ' *)"
     ]
   }
 }

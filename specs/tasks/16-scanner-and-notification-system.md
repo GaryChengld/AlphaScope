@@ -17,14 +17,14 @@ Automate the strategy evaluation engine into a scanner that runs against every s
 
 ## Data Model
 
-One `Notification` per **(strategyId, calendar-day)**. Each notification aggregates all matching tickers via a child `NotificationTicker` table. Running the scanner again on the same day adds newly-matching tickers to the existing notification; tickers already present are skipped.
+One `Notification` per **scan run per strategy** (if at least one ticker qualifies). Multiple notifications for the same strategy can exist on the same day — one per scan run. A ticker that appeared in any prior notification for the same strategy+day is skipped in subsequent runs.
 
 ```
 Notification
   id           Int      PK
   strategyId   String
   strategyName String
-  date         String   "YYYY-MM-DD" — part of unique key (@@unique([strategyId, date]))
+  date         String   "YYYY-MM-DD"
   read         Boolean  default false
   createdAt    DateTime
 
@@ -38,18 +38,21 @@ NotificationTicker
   UNIQUE(notificationId, ticker)
 ```
 
-**Deduplication logic (in `scannerService.ts`):**
-1. `findUnique({ where: { strategyId_date } })` → get or create today's `Notification` for this strategy
-2. `findUnique({ where: { notificationId_ticker } })` → skip if this stock is already in today's notification
+**Scan run logic (in `scannerService.ts`):**
+1. Before evaluating tickers, query all `NotificationTicker` rows for this strategy+date across all prior notifications → build `seenToday` set
+2. Evaluate every ticker; skip if in `seenToday`; collect new passes for this run
+3. If no new tickers pass, skip creating a notification entirely
+4. Otherwise create one new `Notification` with all passing tickers attached atomically; emit `notification:update`
 
 **Deduplication examples:**
 
 | Scenario | Result |
 |----------|--------|
 | 10am scan: RSI matches AAPL, MSFT | 1 `Notification` created (RSI, today); 2 `NotificationTicker` rows |
-| 2pm scan: RSI matches AAPL, GOOG | AAPL skipped; GOOG added to existing RSI notification |
-| 2pm scan: Breakout matches AAPL | New `Notification` created (Breakout, today); AAPL added |
-| Tomorrow scan: RSI matches AAPL | New `Notification` created (RSI, tomorrow's date); AAPL added |
+| 12pm scan: RSI matches AAPL, GOOG | AAPL skipped (seen today); 1 new `Notification` created with GOOG only |
+| 12pm scan: RSI matches nothing new | No `Notification` created |
+| 12pm scan: Breakout matches AAPL | 1 new `Notification` created (Breakout, today); AAPL added |
+| Tomorrow scan: RSI matches AAPL | 1 new `Notification` created (RSI, tomorrow's date); AAPL added |
 
 ---
 
@@ -160,9 +163,12 @@ npm install node-cron
 
 - **Fire-and-forget scan**: `triggerScan()` sets `_scanning = true`, starts `runScan()` as a detached promise with `.finally(() => _scanning = false)`, returns `true`; returns `false` immediately if already running. Both the API route and the scheduler use `triggerScan()` — they share the same in-progress flag regardless of who triggered the scan
 - **Index exclusion**: tickers beginning with `^` are filtered out before the strategy loop — consistent with how `StockDetail.tsx` identifies indices (`ticker.startsWith('^')`)
-- `runScan()` iterates **strategies outer, tickers inner** so one notification record per strategy is created before tickers are added
+- `runScan()` iterates **strategies outer, tickers inner**; for each strategy it pre-fetches all tickers seen in prior notifications for that strategy+date, then evaluates all tickers, then creates one new notification for the run (if any new tickers passed)
+- Notification is created atomically with all its tickers via Prisma nested `create`; `notification:update` is emitted once per notification (not once per ticker)
+- `Notification` has no unique constraint on `(strategyId, date)` — multiple notifications per strategy per day are intentional (one per scan run)
+- Cross-run deduplication is application-level: query `NotificationTicker` filtering through the `notification` relation on `{ strategyId, date }` before each strategy's ticker loop
 - `getIo()` throws if called before `initSocket()` runs, so `initScheduler()` must be called after `initSocket()` in `index.ts`
-- `date` field on `Notification` is a plain `String` ("YYYY-MM-DD") because SQLite has no native date type and Prisma unique constraints can't be placed on computed columns; the date is derived from `new Date().toISOString().slice(0, 10)` which uses UTC — this is consistent across all calls
+- `date` field on `Notification` is a plain `String` ("YYYY-MM-DD") derived from `new Date().toISOString().slice(0, 10)` (UTC) — consistent across all calls
 - **Migration**: schema initially applied with `prisma db push` (no migration history existed). Proper migration file created at `prisma/migrations/20260427000000_init/migration.sql` and marked applied with `prisma migrate resolve --applied 20260427000000_init` — no data was lost
 
 ---
@@ -181,6 +187,6 @@ npm install node-cron
 10. `DELETE /api/notifications/:id` → card disappears immediately; `NotificationTicker` rows cascade-deleted
 11. Click "Run Scan" while scan is running → `POST /api/scanner/run` returns `409 { error: 'Scan already in progress' }`
 12. Index tickers (e.g. `^GSPC`) in watchlists are not evaluated and do not appear in notifications
-13. Run scan again → `skipped` equals prior `created`; no duplicate tickers appear
+13. Run scan again → tickers from the first run are skipped; if new tickers qualify, a second notification card appears; if none qualify, no new notification is created
 14. On a scheduled fire time (market day) → console logs "triggering scheduled scan"
 15. On weekend or NYSE holiday → console logs "not a market day, scan skipped"

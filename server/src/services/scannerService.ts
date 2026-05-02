@@ -1,6 +1,8 @@
 import { prisma } from '../lib/prisma';
 import { getIo } from '../socket/index';
 import { listStrategies, runStrategy, toMarkdown } from './strategy/strategyService';
+import type { ScanCache } from './strategy/strategyContext';
+import { yf } from '../lib/yf';
 
 export interface ScanSummary {
   created: number;
@@ -32,50 +34,69 @@ export function triggerScan(): boolean {
   return true;
 }
 
-async function runScan(): Promise<ScanSummary> {
-  const rows      = await prisma.stock.findMany({ select: { ticker: true } });
-  const tickers   = [...new Set(rows.map(r => r.ticker))].filter(t => !t.startsWith('^'));
-  const strategies = listStrategies();
-  const date      = new Date().toISOString().slice(0, 10);
+async function filterScannable(raw: string[]): Promise<string[]> {
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const quotes = await (yf.quote as any)(raw) as any[];
+    const arr: any[] = Array.isArray(quotes) ? quotes : [quotes];
+    const indexSymbols = new Set(
+      arr.filter(q => q.quoteType === 'INDEX').map(q => q.symbol as string),
+    );
+    return raw.filter(t => !indexSymbols.has(t));
+  } catch {
+    // If the batch quote fails, fall back to the ^ prefix heuristic only
+    return raw;
+  }
+}
 
+async function runScan(): Promise<ScanSummary> {
+  const rows       = await prisma.stock.findMany({ select: { ticker: true } });
+  const rawTickers = [...new Set(rows.map(r => r.ticker))].filter(t => !t.startsWith('^'));
+  const tickers    = await filterScannable(rawTickers);
+  const strategies = listStrategies();
+  const date       = new Date().toISOString().slice(0, 10);
+
+  const scanCache: ScanCache = new Map();
   let created = 0, skipped = 0, errors = 0;
 
   for (const strategy of strategies) {
+    // Tickers already recorded in any previous scan run for this strategy today
+    const priorRows = await prisma.notificationTicker.findMany({
+      where: { notification: { strategyId: strategy.id, date } },
+      select: { ticker: true },
+    });
+    const seenToday = new Set(priorRows.map(r => r.ticker));
+
+    // Evaluate every ticker and collect new passes for this scan run
+    const newPasses: { ticker: string; score: number; markdown: string }[] = [];
+
     for (const ticker of tickers) {
       try {
-        const result = await runStrategy(ticker, strategy.id);
+        const result = await runStrategy(ticker, strategy.id, scanCache);
         if (!result.mandatoryPass) continue;
-
-        let notification = await prisma.notification.findUnique({
-          where: { strategyId_date: { strategyId: strategy.id, date } },
-        });
-        if (!notification) {
-          notification = await prisma.notification.create({
-            data: { strategyId: strategy.id, strategyName: strategy.name, date },
-          });
-        }
-
-        const existing = await prisma.notificationTicker.findUnique({
-          where: { notificationId_ticker: { notificationId: notification.id, ticker } },
-        });
-        if (existing) { skipped++; continue; }
-
-        const markdown = toMarkdown(result);
-        await prisma.notificationTicker.create({
-          data: { notificationId: notification.id, ticker, score: result.totalScore, markdown },
-        });
-        created++;
-
-        const full = await prisma.notification.findUnique({
-          where: { id: notification.id },
-          include: { tickers: { orderBy: { score: 'desc' } } },
-        });
-        getIo().emit('notification:update', full);
+        if (seenToday.has(ticker)) { skipped++; continue; }
+        newPasses.push({ ticker, score: result.totalScore, markdown: toMarkdown(result) });
       } catch {
         errors++;
       }
       await new Promise(r => setTimeout(r, 800));
     }
+
+    // Skip creating a notification if nothing new qualified
+    if (newPasses.length === 0) continue;
+
+    const notification = await prisma.notification.create({
+      data: {
+        strategyId:   strategy.id,
+        strategyName: strategy.name,
+        date,
+        tickers: { create: newPasses },
+      },
+      include: { tickers: { orderBy: { score: 'desc' } } },
+    });
+
+    created += newPasses.length;
+    getIo().emit('notification:update', notification);
   }
 
   return { created, skipped, errors };

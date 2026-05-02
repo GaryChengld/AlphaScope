@@ -77,9 +77,44 @@ export function emaAlignmentSlope(ctx: StrategyContext, params: Record<string, u
     const shrinking = gap[gap.length - 1] < gap[0];
     pass   = shrinking && normSlopes[0] > SLOPE_THRESHOLD;
     detail = `EMA${periods[0]}/EMA${periods[1]} gap ${shrinking ? 'shrinking' : 'widening'}`;
+  } else if (quality === 'ema50_flat') {
+    const FLAT_THRESHOLD = 0.005;
+    const flat = Math.abs(normSlopes[1]) < FLAT_THRESHOLD;
+    pass   = normSlopes[0] > SLOPE_THRESHOLD && flat;
+    detail = `EMA${periods[0]} slope ${(normSlopes[0] * 100).toFixed(2)}% (up), EMA${periods[1]} slope ${(normSlopes[1] * 100).toFixed(2)}% (flat threshold 0.5%)`;
   }
 
   return { pass, detail };
+}
+
+export function weeklyAboveEmaCount(ctx: StrategyContext, params: Record<string, unknown>): RuleResult {
+  const timeframe = paramStr(params, 'timeframe', '1W');
+  const emaPeriod = paramNum(params, 'emaPeriod');
+  const lookback  = paramNum(params, 'lookback', 12);
+  const minCount  = paramNum(params, 'minCount');
+  const maxCount  = paramNumOpt(params, 'maxCount');
+  const tf = ctx.timeframes[timeframe];
+  if (!tf || tf.candles.length < lookback + 1)
+    return { pass: false, detail: `Insufficient ${timeframe} data (need ${lookback + 1} bars)` };
+
+  const emaSeries = tf.ema[emaPeriod] ?? [];
+  if (emaSeries.length < lookback + 1)
+    return { pass: false, detail: `Insufficient ${timeframe} EMA${emaPeriod} data` };
+
+  // Exclude current (possibly incomplete) bar
+  const candles = tf.candles.slice(-lookback - 1, -1);
+  const emas    = emaSeries.slice(-lookback - 1, -1);
+
+  let count = 0;
+  for (let i = 0; i < candles.length; i++) {
+    if (candles[i].close > emas[i]) count++;
+  }
+
+  const pass = count >= minCount && (maxCount == null || count < maxCount);
+  return {
+    pass,
+    detail: `${count} of last ${lookback} completed weekly closes above EMA${emaPeriod}`,
+  };
 }
 
 export function weeklyTrend(ctx: StrategyContext, params: Record<string, unknown>): RuleResult {

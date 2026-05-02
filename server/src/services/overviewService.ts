@@ -2,7 +2,7 @@ import { getLivePrices } from './stockService';
 
 // ─── Market Indicators ─────────────────────────────────────────────────────────
 
-const MARKET_TICKERS = ['^GSPC', '^NDX', '^IXIC', '^DJI', '^VIX', 'DX-Y.NYB', '^TNX', 'CL=F'];
+const MARKET_TICKERS = ['^GSPC', '^NDX', '^IXIC', '^DJI', '^VIX', 'DX-Y.NYB', '^TNX', 'CL=F', 'GC=F', 'BTC-USD'];
 
 const MARKET_LABELS: Record<string, string> = {
   '^GSPC':    'S&P 500',
@@ -13,6 +13,8 @@ const MARKET_LABELS: Record<string, string> = {
   'DX-Y.NYB': 'US Dollar',
   '^TNX':     '10Y Yield',
   'CL=F':     'Crude Oil',
+  'GC=F':     'Gold',
+  'BTC-USD':  'Bitcoin',
 };
 
 export interface MarketIndicator {

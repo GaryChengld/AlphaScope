@@ -13,13 +13,14 @@ export type RuleFn = (ctx: StrategyContext, params: Record<string, unknown>) => 
 
 export const RULES: Record<string, RuleFn> = {
   // Trend
-  priceAboveEma:       trend.priceAboveEma,
-  emaAlignment:        trend.emaAlignment,
-  emaAlignmentSlope:   trend.emaAlignmentSlope,
-  weeklyTrend:         trend.weeklyTrend,
-  uptrendDuration:     trend.uptrendDuration,
-  rsVsSpy:             trend.rsVsSpy,
-  spyAboveEma:         trend.spyAboveEma,
+  priceAboveEma:        trend.priceAboveEma,
+  emaAlignment:         trend.emaAlignment,
+  emaAlignmentSlope:    trend.emaAlignmentSlope,
+  weeklyTrend:          trend.weeklyTrend,
+  weeklyAboveEmaCount:  trend.weeklyAboveEmaCount,
+  uptrendDuration:      trend.uptrendDuration,
+  rsVsSpy:              trend.rsVsSpy,
+  spyAboveEma:          trend.spyAboveEma,
   // Pullback
   validPullback:       pullback.validPullback,
   pullbackToSupport:   pullback.pullbackToSupport,

@@ -405,7 +405,7 @@ export default function StockDetail() {
   const [analysisLoading, setAnalysisLoading] = useState(false);
   const [loading, setLoading] = useState(true);
   const [period, setPeriod] = useState<Period>('1D');
-  const [tab, setTab] = useState<'fundamentals' | 'technicals' | 'analysis' | 'strategy' | 'news'>('fundamentals');
+  const [tab, setTab] = useState<'chart' | 'fundamentals' | 'technicals' | 'analysis' | 'strategy' | 'news'>('chart');
 
   const [strategies, setStrategies] = useState<{ id: string; name: string; version: string }[] | null>(null);
   const [selectedStrategyId, setSelectedStrategyId] = useState<string>('');
@@ -460,7 +460,7 @@ export default function StockDetail() {
   const isStock = summary?.quoteType === 'EQUITY';
   const isEtf = summary?.quoteType === 'ETF';
   const strategyEligible = isStock || isEtf;
-  const visibleTabs = (['fundamentals', 'technicals', 'analysis', 'strategy', 'news'] as const).filter((t) => {
+  const visibleTabs = (['chart', 'fundamentals', 'technicals', 'analysis', 'strategy', 'news'] as const).filter((t) => {
     if (t === 'strategy') return strategyEligible;
     if (t === 'fundamentals' || t === 'analysis') return isStock;
     return true;
@@ -582,55 +582,6 @@ export default function StockDetail() {
         )}
       </div>
 
-      {/* ── Chart + Key Stats ── */}
-      <div className="flex shrink-0 border-b border-gray-800" style={{ height: 600 }}>
-        {/* Chart */}
-        <div className="flex flex-col flex-1 min-w-0 p-3 gap-2">
-          {/* Period buttons */}
-          <div className="flex gap-1 shrink-0">
-            {PERIODS.map((p) => (
-              <button
-                key={p}
-                onClick={() => setPeriod(p)}
-                className={`px-3 py-1 text-xs rounded font-medium transition-colors border
-                  ${period === p
-                    ? 'bg-blue-500/20 text-blue-400 border-blue-500/30'
-                    : 'text-gray-500 hover:text-gray-300 hover:bg-gray-800 border-transparent'
-                  }`}
-              >
-                {p.toUpperCase()}
-              </button>
-            ))}
-          </div>
-          {/* Chart area */}
-          <div className="flex-1 min-h-0 rounded-lg overflow-hidden bg-gray-900">
-            {isIndex
-              ? <IndexChart ticker={ticker} period={period} />
-              : <TradingViewChart symbol={ticker} period={period} />
-            }
-          </div>
-        </div>
-
-        {/* Key Stats */}
-        <div className="w-[280px] shrink-0 border-l border-gray-800 overflow-y-auto px-4 py-3">
-          <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Key Statistics</h3>
-          <StatRow label="Previous Close"          value={fmt(summary?.previousClose ?? null)} />
-          <StatRow label="Open"                    value={fmt(summary?.open ?? null)} />
-          <StatRow label="Day's Range"             value={summary?.dayRangeLow != null && summary?.dayRangeHigh != null ? `${fmt(summary.dayRangeLow)} – ${fmt(summary.dayRangeHigh)}` : '—'} />
-          <StatRow label="52 Week Range"           value={summary?.fiftyTwoWeekLow != null && summary?.fiftyTwoWeekHigh != null ? `${fmt(summary.fiftyTwoWeekLow)} – ${fmt(summary.fiftyTwoWeekHigh)}` : '—'} />
-          <StatRow label="Volume"                  value={fmtVol(summary?.volume ?? null)} />
-          <StatRow label="Avg. Volume"             value={fmtVol(summary?.averageVolume ?? null)} />
-          <StatRow label="Market Cap"              value={fmtLarge(summary?.marketCap ?? null)} />
-          <StatRow label="Beta (5Y Monthly)"       value={fmt(summary?.beta ?? null)} />
-          <StatRow label="PE Ratio (TTM)"          value={fmt(summary?.trailingPE ?? null)} />
-          <StatRow label="EPS (TTM)"               value={fmt(summary?.trailingEps ?? null)} />
-          <StatRow label="Next Earnings Date"      value={fmtDate(summary?.earningsDate ?? null)} />
-          <StatRow label="Forward Div & Yield"     value={summary?.dividendRate != null && summary?.dividendYield != null ? `${fmt(summary.dividendRate)} (${fmtPct(summary.dividendYield)})` : '—'} />
-          <StatRow label="Ex-Dividend Date"        value={fmtDate(summary?.exDividendDate ?? null)} />
-          <StatRow label="1y Target Est"           value={fmt(summary?.targetMeanPrice ?? null)} />
-        </div>
-      </div>
-
       {/* ── Tabs ── */}
       <div className="flex flex-col flex-1 min-h-0">
         {/* Tab bar */}
@@ -650,8 +601,52 @@ export default function StockDetail() {
           ))}
         </div>
 
-        {/* Tab panels */}
-        <div className="px-5 py-4 overflow-y-auto flex-1">
+        {/* Chart tab — always mounted to prevent re-init on tab switch; hidden via CSS when inactive */}
+        <div className={`flex flex-1 min-h-0 ${activeTab === 'chart' ? '' : 'hidden'}`}>
+            <div className="flex flex-col flex-1 min-w-0 p-3 gap-2">
+              <div className="flex gap-1 shrink-0">
+                {PERIODS.map((p) => (
+                  <button
+                    key={p}
+                    onClick={() => setPeriod(p)}
+                    className={`px-3 py-1 text-xs rounded font-medium transition-colors border
+                      ${period === p
+                        ? 'bg-blue-500/20 text-blue-400 border-blue-500/30'
+                        : 'text-gray-500 hover:text-gray-300 hover:bg-gray-800 border-transparent'
+                      }`}
+                  >
+                    {p.toUpperCase()}
+                  </button>
+                ))}
+              </div>
+              <div className="flex-1 min-h-0 rounded-lg overflow-hidden bg-gray-900">
+                {isIndex
+                  ? <IndexChart ticker={ticker} period={period} />
+                  : <TradingViewChart symbol={ticker} period={period} />
+                }
+              </div>
+            </div>
+            <div className="w-[280px] shrink-0 border-l border-gray-800 overflow-y-auto px-4 py-3">
+              <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Key Statistics</h3>
+              <StatRow label="Previous Close"          value={fmt(summary?.previousClose ?? null)} />
+              <StatRow label="Open"                    value={fmt(summary?.open ?? null)} />
+              <StatRow label="Day's Range"             value={summary?.dayRangeLow != null && summary?.dayRangeHigh != null ? `${fmt(summary.dayRangeLow)} – ${fmt(summary.dayRangeHigh)}` : '—'} />
+              <StatRow label="52 Week Range"           value={summary?.fiftyTwoWeekLow != null && summary?.fiftyTwoWeekHigh != null ? `${fmt(summary.fiftyTwoWeekLow)} – ${fmt(summary.fiftyTwoWeekHigh)}` : '—'} />
+              <StatRow label="Volume"                  value={fmtVol(summary?.volume ?? null)} />
+              <StatRow label="Avg. Volume"             value={fmtVol(summary?.averageVolume ?? null)} />
+              <StatRow label="Market Cap"              value={fmtLarge(summary?.marketCap ?? null)} />
+              <StatRow label="Beta (5Y Monthly)"       value={fmt(summary?.beta ?? null)} />
+              <StatRow label="PE Ratio (TTM)"          value={fmt(summary?.trailingPE ?? null)} />
+              <StatRow label="EPS (TTM)"               value={fmt(summary?.trailingEps ?? null)} />
+              <StatRow label="Next Earnings Date"      value={fmtDate(summary?.earningsDate ?? null)} />
+              <StatRow label="Forward Div & Yield"     value={summary?.dividendRate != null && summary?.dividendYield != null ? `${fmt(summary.dividendRate)} (${fmtPct(summary.dividendYield)})` : '—'} />
+              <StatRow label="Ex-Dividend Date"        value={fmtDate(summary?.exDividendDate ?? null)} />
+              <StatRow label="1y Target Est"           value={fmt(summary?.targetMeanPrice ?? null)} />
+            </div>
+        </div>
+
+        {/* Other tab panels — scrollable */}
+        <div className={`px-5 py-4 overflow-y-auto flex-1 ${activeTab === 'chart' ? 'hidden' : ''}`}>
           {activeTab === 'fundamentals' && (
             <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
 

@@ -37,8 +37,6 @@ model Notification {
   read         Boolean              @default(false)
   createdAt    DateTime             @default(now())
   tickers      NotificationTicker[]
-
-  @@unique([strategyId, date])
 }
 
 model NotificationTicker {

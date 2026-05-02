@@ -27,13 +27,16 @@ export default function TradingViewChart({ symbol, period }: TradingViewChartPro
     container.innerHTML = '';
 
     const interval = PERIOD_TO_INTERVAL[period] ?? 'D';
+    const tvSymbol = /\.TO$/i.test(symbol)
+      ? `TSX:${symbol.replace(/\.TO$/i, '')}`
+      : symbol;
 
     const script = document.createElement('script');
     script.src = 'https://s3.tradingview.com/external-embedding/embed-widget-advanced-chart.js';
     script.async = true;
     script.innerHTML = JSON.stringify({
       autosize: true,
-      symbol,
+      symbol: tvSymbol,
       interval,
       timezone: 'America/New_York',
       theme: 'dark',

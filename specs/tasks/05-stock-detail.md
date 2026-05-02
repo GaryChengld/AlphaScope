@@ -11,18 +11,18 @@ Implements the full stock detail page: live summary header, chart, key stats pan
 ```
 ┌─ Summary header ─────────────────────────────── H/L/Vol/Cap (right) ─┐
 │  AAPL  Apple Inc.   $213.45  +2.31 (+1.09%)                           │
-├─ Chart area ──────────────────────────────────┬─ Key Stats (280px) ───┤
-│  [1H][2H][4H][1D][1W][1M]  ← timeframe        │  Previous Close       │
-│                                                │  Open / Day's Range   │
-│  TradingView widget (EQUITY / ETF / CRYPTO)    │  52 Week Range        │
-│  lightweight-charts  (INDEX only)              │  Volume / Avg Volume  │
-│    • Candlestick + Volume histogram (pane 0)   │  Market Cap / Beta    │
-│    • RSI (pane 1, 25%)                         │  PE Ratio / EPS       │
-│    • attributionLogo: false                    │  Earnings Date        │
-│    • 30s auto-refresh (preserves zoom)         │  Dividend / Ex-Date   │
-│                                                │  1y Target Est        │
-├─ Tabs: Fundamentals | Technicals | News ───────┴───────────────────────┤
-│  (tab panel scrollable; chart + header fixed)                           │
+├─ Tabs: Chart | Fundamentals | Technicals | Analysis | Strategy | News ─┤
+│  ── Chart tab (default) ─────────────────────┬─ Key Stats (280px) ───│
+│  [15m][30m][1H][2H][4H][1D][1W][1M]          │  Previous Close       │
+│                                               │  Open / Day's Range   │
+│  TradingView widget (EQUITY / ETF / CRYPTO)   │  52 Week Range        │
+│  lightweight-charts  (INDEX only)             │  Volume / Avg Volume  │
+│    • Candlestick + Volume histogram (pane 0)  │  Market Cap / Beta    │
+│    • RSI (pane 1, 25%)                        │  PE Ratio / EPS       │
+│    • attributionLogo: false                   │  Earnings Date        │
+│    • 30s auto-refresh (preserves zoom)        │  Dividend / Ex-Date   │
+│                                               │  1y Target Est        │
+│  ── Other tabs (scrollable) ─────────────────┴───────────────────────│
 ├─ Fundamentals (4-column grid of groups) ────────────────────────────── │
 │  Valuation | Income Statement | Margins | Profitability                 │
 │  Balance Sheet | Cash Flow | Share Statistics                           │
@@ -166,9 +166,11 @@ For INDEX (ticker starts with `^` or `quoteType === 'INDEX'`). Single `createCha
 2. Fetch `/summary` + `/news` in parallel on ticker change; `/summary` also re-fetches every 30s
 3. **Summary header** — symbol + name + exchange + `<WatchlistBookmark>` (left), price + change (left), H/L/Vol/Cap stacked 4 lines (right)
    - Below regular price: extended hours row (smaller font, green/red) shown only when `marketState` is `PRE`/`PREPRE` (pre-market) or `POST`/`POSTPOST`/`CLOSED` (after hours); hidden during regular market hours or if no data
-4. **Chart** — `isIndex = quoteType === 'INDEX' || ticker.startsWith('^')`; fixed `height: 600`, `overflow-hidden`
-5. **Key Stats panel** — `w-[280px] shrink-0`; 14 rows; `—` for nulls
-6. **Tabs** — `fundamentals | technicals | news`; tab panel is `overflow-y-auto flex-1` (only scrollable section)
+4. **Tabs** — `chart | fundamentals | technicals | analysis | strategy | news`; `chart` is default and always visible; `fundamentals`/`analysis` are stock-only; `strategy` is stock+ETF only
+5. **Chart tab** — fills remaining height (`flex flex-1 min-h-0`), not scrollable; contains period selector + chart + key stats side panel
+   - `isIndex = quoteType === 'INDEX' || ticker.startsWith('^')`; uses `IndexChart` for indices, `TradingViewChart` otherwise
+   - **Key Stats panel** — `w-[280px] shrink-0`; 14 rows; `—` for nulls
+6. **Other tabs** — wrapped in `overflow-y-auto flex-1` scrollable container
 7. **Fundamentals** — 4-column grid of `FundGroup` components (each a bordered card with green group title):
    - Valuation, Income Statement, Margins, Profitability, Balance Sheet, Cash Flow, Share Statistics
 8. **Technicals** — two columns: Moving Averages (MA5–MA200 with Above/Below badge) + Oscillators (RSI, ATR, MACD, BB, Stochastic)

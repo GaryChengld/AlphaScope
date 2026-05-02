@@ -110,8 +110,8 @@ function MarketIndicatorBar({
 }) {
   if (indicators.length === 0) {
     return (
-      <div className="grid grid-cols-8 gap-2">
-        {Array.from({ length: 8 }).map((_, i) => (
+      <div className="grid grid-cols-10 gap-2">
+        {Array.from({ length: 10 }).map((_, i) => (
           <div key={i} className="h-16 rounded-lg border border-gray-700 bg-gray-800 animate-pulse" />
         ))}
       </div>
@@ -119,7 +119,7 @@ function MarketIndicatorBar({
   }
 
   return (
-    <div className="grid grid-cols-8 gap-2">
+    <div className="grid grid-cols-10 gap-2">
       {indicators.map((ind) => {
         const isActive = ind.ticker === selected;
         const pct = ind.changePct;

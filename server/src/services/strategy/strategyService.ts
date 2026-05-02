@@ -1,6 +1,6 @@
 import fs   from 'fs';
 import path from 'path';
-import { buildStrategyContext } from './strategyContext';
+import { buildStrategyContext, ScanCache } from './strategyContext';
 import { evaluateStrategy, StrategyDefinition, StrategyResult, SectionResult } from './strategyEngine';
 import { RULES } from '../rules/ruleRegistry';
 
@@ -90,9 +90,9 @@ function validateStrategy(s: StrategyDefinition, fileName: string): void {
   }
 }
 
-export async function runStrategy(ticker: string, strategyId: string): Promise<StrategyResult> {
+export async function runStrategy(ticker: string, strategyId: string, scanCache?: ScanCache): Promise<StrategyResult> {
   const strategy = loadStrategy(strategyId);
-  const ctx = await buildStrategyContext(ticker, strategy.requires);
+  const ctx = await buildStrategyContext(ticker, strategy.requires, scanCache);
   return evaluateStrategy(ctx, strategy);
 }
 

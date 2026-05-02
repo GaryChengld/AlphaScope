@@ -10,7 +10,7 @@ Implement the Overview page with a live market indicators bar, an interactive in
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│  [S&P 500] [Nasdaq 100] [Nasdaq Comp] [Dow] [VIX] [DXY] [TNX] [Oil]  │  ← top bar
+│  [S&P 500] [Nasdaq 100] [Nasdaq Comp] [Dow] [VIX] [DXY] [TNX] [Oil] [Gold] [BTC]  │  ← top bar (grid-cols-10)
 ├──────────────────────────────────┬──────────────────────────┤
 │                                  │                          │
 │   IndexChart  (2/3 width)        │  Sector Heatmap (1/3)   │
@@ -33,8 +33,12 @@ Implement the Overview page with a live market indicators bar, an interactive in
 | US Dollar    | DX-Y.NYB   | DXY index                    |
 | 10Y Yield    | ^TNX       | client shows raw value + `%` (Yahoo returns actual % e.g. 4.25) |
 | Crude Oil    | CL=F       | WTI front-month futures      |
+| Gold         | GC=F       | Gold front-month futures     |
+| Bitcoin      | BTC-USD    |                              |
 
 > **Note on ^TNX:** Yahoo Finance returns the 10-year yield as the actual percentage value (e.g. 4.25 = 4.25%). The client appends `%` with no division needed.
+
+> **Note on Toronto (TSX) tickers:** Yahoo Finance uses the `.TO` suffix (e.g. `TD.TO`). TradingView requires the `TSX:` exchange prefix without the suffix (e.g. `TSX:TD`). `TradingViewChart.tsx` transforms any symbol ending in `.TO` → `TSX:<symbol>` before passing it to the widget.
 
 ---
 
@@ -43,7 +47,7 @@ Implement the Overview page with a live market indicators bar, an interactive in
 ### New service: `overviewService.ts`
 
 **`getMarketIndicators()`**
-- Calls `getLivePrices(['^GSPC', '^NDX', '^IXIC', '^DJI', '^VIX', 'DX-Y.NYB', '^TNX', 'CL=F'])`
+- Calls `getLivePrices(['^GSPC', '^NDX', '^IXIC', '^DJI', '^VIX', 'DX-Y.NYB', '^TNX', 'CL=F', 'GC=F', 'BTC-USD'])`
 - Returns array: `{ ticker, label, price, change, changePct }` — same shape as existing `getLivePrices`, with `label` added from a static map
 - No instrument-specific corrections; all raw Yahoo values
 
@@ -73,7 +77,7 @@ Mount at `/api/overview` in `index.ts`.
 - `period`: chart period, default `'1D'` (same `PERIODS` type as StockDetail)
 
 **Top bar — `MarketIndicatorBar`**
-- Horizontal scrollable row of pill cards
+- 10-column grid (`grid-cols-10`) of pill cards
 - Each card: label (top, small gray), price (large, white), change% (colored)
 - Active card: blue ring / subtle blue background
 - On click: sets `selected` → chart updates

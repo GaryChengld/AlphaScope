@@ -53,6 +53,14 @@ export interface StrategyContext {
   sectorReturns: Record<string, number>;
 }
 
+export interface QuoteSummary {
+  assetProfile?:    { sector?: string };
+  calendarEvents?:  { earnings?: { earningsDate?: unknown[] } };
+}
+
+type ScanCacheValue = OhlcvRow[] | QuoteSummary | null | number | Record<string, number>;
+export type ScanCache = Map<string, ScanCacheValue>;
+
 const SECTOR_TO_ETF: Record<string, string> = {
   'Technology':             'XLK',
   'Financial Services':     'XLF',
@@ -69,59 +77,11 @@ const SECTOR_TO_ETF: Record<string, string> = {
 
 const SECTOR_TICKERS = Object.values(SECTOR_TO_ETF);
 
-// Minimal local typing for the slice of yahoo-finance2 quoteSummary we use,
-// so we don't have to sprinkle `any` casts at every access site.
-interface QuoteSummary {
-  assetProfile?:    { sector?: string };
-  calendarEvents?:  { earnings?: { earningsDate?: unknown[] } };
-}
 type QuoteSummaryFn = (
   ticker: string,
   opts: { modules: string[] },
   reqOpts: { validateResult: boolean },
 ) => Promise<QuoteSummary>;
-
-// ─── Caches ───────────────────────────────────────────────────────────────────
-// SPY candles and sector ETF 30-day returns change at most once per market day,
-// but every strategy evaluation needs them. Cache at the promise level so
-// concurrent first-fetches dedupe to a single network call.
-
-const CACHE_TTL_MS = 30 * 60 * 1000; // 30 minutes
-
-let spyCandlesPromise: Promise<OhlcvRow[]> | null = null;
-let spyCandlesTimestamp = 0;
-
-function getCachedSpyCandles(): Promise<OhlcvRow[]> {
-  if (!spyCandlesPromise || Date.now() - spyCandlesTimestamp > CACHE_TTL_MS) {
-    spyCandlesPromise = getStockCandles('SPY', '1D').catch(() => [] as OhlcvRow[]);
-    spyCandlesTimestamp = Date.now();
-  }
-  return spyCandlesPromise;
-}
-
-let sectorReturnsPromise: Promise<Record<string, number>> | null = null;
-let sectorReturnsTimestamp = 0;
-
-function getCachedSectorReturns(): Promise<Record<string, number>> {
-  if (!sectorReturnsPromise || Date.now() - sectorReturnsTimestamp > CACHE_TTL_MS) {
-    sectorReturnsPromise = (async () => {
-      const results = await Promise.allSettled(
-        SECTOR_TICKERS.map(t => getStockCandles(t, '1D')),
-      );
-      const out: Record<string, number> = {};
-      SECTOR_TICKERS.forEach((etf, i) => {
-        const r = results[i];
-        if (r.status === 'fulfilled' && r.value.length >= 22) {
-          const c = r.value;
-          out[etf] = (c[c.length - 1].close - c[c.length - 22].close) / c[c.length - 22].close;
-        }
-      });
-      return out;
-    })();
-    sectorReturnsTimestamp = Date.now();
-  }
-  return sectorReturnsPromise;
-}
 
 function buildTimeframeData(
   candles: OhlcvRow[],
@@ -196,16 +156,63 @@ function buildTimeframeData(
   return { candles: cleanCandles, ema, atr, rsi, adx, bb, macd };
 }
 
+async function fetchSectorReturns(): Promise<Record<string, number>> {
+  const results = await Promise.allSettled(
+    SECTOR_TICKERS.map(t => getStockCandles(t, '1D')),
+  );
+  const out: Record<string, number> = {};
+  SECTOR_TICKERS.forEach((etf, i) => {
+    const r = results[i];
+    if (r.status === 'fulfilled' && r.value.length >= 22) {
+      const c = r.value;
+      out[etf] = (c[c.length - 1].close - c[c.length - 22].close) / c[c.length - 22].close;
+    }
+  });
+  return out;
+}
+
 export async function buildStrategyContext(
   ticker: string,
   requires: IndicatorRequirements,
+  scanCache?: ScanCache,
 ): Promise<StrategyContext> {
   const tfKeys = Object.keys(requires.timeframes);
 
   const quoteSummary = (yf.quoteSummary as unknown as QuoteSummaryFn).bind(yf);
 
-  // Uniform allSettled — every fetch can fail independently and we degrade
-  // gracefully rather than blowing up the whole evaluation.
+  // ── Ticker candles ──────────────────────────────────────────────────────────
+  const candlePromises = tfKeys.map(tf => {
+    const key = `candles:${ticker}:${tf}`;
+    if (scanCache?.has(key)) return Promise.resolve(scanCache.get(key) as OhlcvRow[]);
+    return getStockCandles(ticker, tf).then(rows => { scanCache?.set(key, rows); return rows; });
+  });
+
+  // ── SPY candles ─────────────────────────────────────────────────────────────
+  const spyKey = 'candles:SPY:1D';
+  const spyPromise: Promise<OhlcvRow[]> = scanCache?.has(spyKey)
+    ? Promise.resolve(scanCache.get(spyKey) as OhlcvRow[])
+    : getStockCandles('SPY', '1D').then(rows => { scanCache?.set(spyKey, rows); return rows; });
+
+  // ── VIX ─────────────────────────────────────────────────────────────────────
+  const vixPromise = scanCache?.has('vix')
+    ? Promise.resolve({ '^VIX': { price: scanCache.get('vix') as number | null } })
+    : getLivePrices(['^VIX']).then(prices => {
+        scanCache?.set('vix', prices['^VIX']?.price ?? null);
+        return prices;
+      });
+
+  // ── quoteSummary (sector + earnings) ────────────────────────────────────────
+  const summaryKey = `summary:${ticker}`;
+  const summaryPromise: Promise<QuoteSummary> = scanCache?.has(summaryKey)
+    ? Promise.resolve(scanCache.get(summaryKey) as QuoteSummary)
+    : quoteSummary(ticker, { modules: ['assetProfile', 'calendarEvents'] }, { validateResult: false })
+        .then(r => { scanCache?.set(summaryKey, r); return r; });
+
+  // ── Sector ETF returns ──────────────────────────────────────────────────────
+  const sectorPromise: Promise<Record<string, number>> = scanCache?.has('sectorReturns')
+    ? Promise.resolve(scanCache.get('sectorReturns') as Record<string, number>)
+    : fetchSectorReturns().then(out => { scanCache?.set('sectorReturns', out); return out; });
+
   const [
     candleResults,
     spyResult,
@@ -213,13 +220,11 @@ export async function buildStrategyContext(
     summaryResult,
     sectorResult,
   ] = await Promise.all([
-    Promise.allSettled(tfKeys.map(tf => getStockCandles(ticker, tf))),
-    Promise.allSettled([getCachedSpyCandles()]),
-    Promise.allSettled([getLivePrices(['^VIX'])]),
-    Promise.allSettled([
-      quoteSummary(ticker, { modules: ['assetProfile', 'calendarEvents'] }, { validateResult: false }),
-    ]),
-    Promise.allSettled([getCachedSectorReturns()]),
+    Promise.allSettled(candlePromises),
+    Promise.allSettled([spyPromise]),
+    Promise.allSettled([vixPromise]),
+    Promise.allSettled([summaryPromise]),
+    Promise.allSettled([sectorPromise]),
   ]);
 
   const timeframes: Record<string, TimeframeData> = {};
