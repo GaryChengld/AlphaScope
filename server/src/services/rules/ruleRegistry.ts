@@ -35,6 +35,7 @@ export const RULES: Record<string, RuleFn> = {
   rsiStructure:        pullback.rsiStructure,
   firstPullbackToEma:  pullback.firstPullbackToEma,
   priorRunStrength:    pullback.priorRunStrength,
+  nearSwingLow:        pullback.nearSwingLow,
   // Trigger
   hourlyEmaCrossover:    trigger.hourlyEmaCrossover,
   hourlyStructureBreak:  trigger.hourlyStructureBreak,

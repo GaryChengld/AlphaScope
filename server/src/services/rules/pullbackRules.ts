@@ -347,6 +347,45 @@ export function firstPullbackToEma(ctx: StrategyContext, params: Record<string, 
   };
 }
 
+export function nearSwingLow(ctx: StrategyContext, params: Record<string, unknown>): RuleResult {
+  const timeframe     = paramStr(params, 'timeframe', '1D');
+  const atrPeriod     = paramNum(params, 'atrPeriod', 14);
+  const lookback      = paramNum(params, 'lookback', 20);
+  const atrMultiplier = paramNum(params, 'atrMultiplier', 1.0);
+  const tf = ctx.timeframes[timeframe];
+  if (!tf) return { pass: false, detail: `No ${timeframe} data` };
+
+  const atr = last(tf.atr[atrPeriod]);
+  const sh  = findSwingHigh(ctx, timeframe, lookback);
+  if (atr == null || !sh)
+    return { pass: false, detail: 'Insufficient data for pullback bounce check' };
+
+  // Only examine bars from the swing high to the current bar (the current pullback)
+  const pullbackBars = tf.candles.slice(-(sh.barsAgo + 1));
+  if (pullbackBars.length < 2)
+    return { pass: false, detail: 'Insufficient pullback bars' };
+
+  // Find the pullback low (minimum LOW in this window)
+  let pullbackLow = Infinity, pullbackLowIdx = 0;
+  pullbackBars.forEach((c, i) => {
+    if (c.low < pullbackLow) { pullbackLow = c.low; pullbackLowIdx = i; }
+  });
+
+  // Measure the largest bounce from the pullback low (max HIGH of bars after the low)
+  const barsAfterLow    = pullbackBars.slice(pullbackLowIdx + 1);
+  const maxHighAfterLow = barsAfterLow.length > 0
+    ? Math.max(...barsAfterLow.map(c => c.high))
+    : pullbackLow;
+
+  const bounceHeight = maxHighAfterLow - pullbackLow;
+  const threshold    = atrMultiplier * atr;
+  const pass         = bounceHeight < threshold;
+  return {
+    pass,
+    detail: `Post-low bounce ${bounceHeight.toFixed(2)} (${(bounceHeight / atr).toFixed(1)}×ATR${atrPeriod}) from pullback low $${pullbackLow.toFixed(2)} — max ${atrMultiplier}×ATR (${threshold.toFixed(2)}) allowed`,
+  };
+}
+
 export function priorRunStrength(ctx: StrategyContext, params: Record<string, unknown>): RuleResult {
   const timeframe   = paramStr(params, 'timeframe', '1D');
   const emaPeriod   = paramNum(params, 'emaPeriod');

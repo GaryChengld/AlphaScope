@@ -27,6 +27,7 @@ interface RightPanelProps {
   onMarkRead: (id: number) => void;
   onDelete: (id: number) => void;
   scanRunning: boolean;
+  onRunScan: () => void;
 }
 
 function relativeTime(iso: string): string {
@@ -39,7 +40,7 @@ function relativeTime(iso: string): string {
   return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 }
 
-export default function RightPanel({ open, onClose, notifications, onMarkRead, onDelete, scanRunning }: RightPanelProps) {
+export default function RightPanel({ open, onClose, notifications, onMarkRead, onDelete, scanRunning, onRunScan }: RightPanelProps) {
   const navigate = useNavigate();
   const [expandedId, setExpandedId] = useState<number | null>(null);
 
@@ -47,10 +48,6 @@ export default function RightPanel({ open, onClose, notifications, onMarkRead, o
 
   const toggleExpand = (id: number) =>
     setExpandedId(prev => (prev === id ? null : id));
-
-  const handleRunScan = () => {
-    fetch('/api/scanner/run', { method: 'POST' }).catch(() => {});
-  };
 
   return (
     <aside
@@ -77,7 +74,7 @@ export default function RightPanel({ open, onClose, notifications, onMarkRead, o
                 </span>
               ) : (
                 <button
-                  onClick={handleRunScan}
+                  onClick={onRunScan}
                   className="text-[10px] text-blue-400 hover:text-blue-300 transition-colors"
                 >
                   Run Scan

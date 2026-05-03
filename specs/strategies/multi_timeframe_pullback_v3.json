@@ -30,8 +30,13 @@
     },
     {
       "rule": "validPullback",
-      "params": { "timeframe": "1D", "atrPeriod": 14, "lookback": 20, "minAtr": 1.0, "maxAtr": 3.0 },
-      "label": "Valid pullback 1.0–3.0× ATR from 20-bar high"
+      "params": { "timeframe": "1D", "atrPeriod": 14, "lookback": 20, "minAtr": 1.0, "maxAtr": 4.0 },
+      "label": "Valid pullback 1.0–4.0× ATR from 20-bar high"
+    },
+    {
+      "rule": "nearSwingLow",
+      "params": { "timeframe": "1D", "atrPeriod": 14, "lookback": 20, "atrMultiplier": 2.0 },
+      "label": "No significant bounce after pullback low (< 2.0× ATR)"
     },
     {
       "rule": "pullbackToSupport",
@@ -109,19 +114,19 @@
           "conditions": [
             {
               "rule": "rsVsSpy",
-              "params": { "timeframe": "1D", "lookback": 63, "minRatio": 1.10 },
+              "params": { "timeframe": "1D", "lookback": 63, "minRatio": 1.1 },
               "points": 6,
               "label": "RS ratio > 1.10 (outperforming SPY)"
             },
             {
               "rule": "rsVsSpy",
-              "params": { "timeframe": "1D", "lookback": 63, "minRatio": 1.00, "maxRatio": 1.10 },
+              "params": { "timeframe": "1D", "lookback": 63, "minRatio": 1.0, "maxRatio": 1.1 },
               "points": 3,
               "label": "RS ratio 1.00–1.10 (slight outperformance)"
             },
             {
               "rule": "rsVsSpy",
-              "params": { "timeframe": "1D", "lookback": 63, "minRatio": 0.95, "maxRatio": 1.00 },
+              "params": { "timeframe": "1D", "lookback": 63, "minRatio": 0.95, "maxRatio": 1.0 },
               "points": 1,
               "label": "RS ratio 0.95–1.00 (near parity with SPY)"
             }

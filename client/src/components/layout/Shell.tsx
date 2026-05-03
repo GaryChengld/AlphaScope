@@ -51,7 +51,11 @@ export default function Shell() {
       });
     });
     socket.on('scanner:started',  () => setScanRunning(true));
-    socket.on('scanner:complete', () => setScanRunning(false));
+    socket.on('scanner:complete', () => {
+      setScanRunning(false);
+      // Refetch in case any notification:update events were missed
+      fetch('/api/notifications').then(r => r.json()).then(setNotifications).catch(() => {});
+    });
     return () => {
       socket.off('notification:update');
       socket.off('scanner:started');
@@ -59,6 +63,13 @@ export default function Shell() {
       socket.disconnect();
     };
   }, []);
+
+  const handleRunScan = async () => {
+    setScanRunning(true);
+    const r = await fetch('/api/scanner/run', { method: 'POST' }).catch(() => null);
+    // Reset only on unexpected errors (not 409 "already running" — that keeps scanRunning true)
+    if (r && !r.ok && r.status !== 409) setScanRunning(false);
+  };
 
   const unreadCount = notifications.filter(n => !n.read).length;
 
@@ -92,6 +103,7 @@ export default function Shell() {
             onMarkRead={markAsRead}
             onDelete={deleteNotification}
             scanRunning={scanRunning}
+            onRunScan={handleRunScan}
           />
         </div>
       </div>

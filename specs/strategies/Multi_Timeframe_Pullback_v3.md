@@ -10,7 +10,8 @@ Evaluates whether the current daily bar is a valid pullback entry within a confi
 
 - [ ] **Daily trend up** — Close > Daily EMA 200, and EMA 20 > EMA 50 > EMA 200
 - [ ] **Weekly trend up** — Close > Weekly EMA 50
-- [ ] **Valid pullback** — Price has pulled back 1.0–3.0× ATR(14) from the 20-bar high
+- [ ] **Valid pullback** — Price has pulled back 1.0–4.0× ATR(14) from the 20-bar high
+- [ ] **No significant bounce** — Post-low bounce < 2× ATR(14) since the swing high (filters V-bottom re-tests)
 - [ ] **Near support** — Close within 1.0× ATR(14) of Daily EMA 20 or EMA 50
 - [ ] **Bullish market** — SPY > its 50-day EMA
 - [ ] **No earnings** within 5 trading days
