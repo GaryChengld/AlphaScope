@@ -40,5 +40,12 @@
     "version": "1.0",
     "file":    "abc_pullback_continuation_v1.json",
     "enabled": true
+  },
+  {
+    "id":      "first_pullback_50day",
+    "name":    "First Pullback to 50-Day",
+    "version": "1.0",
+    "file":    "first_pullback_50day_v1.json",
+    "enabled": true
   }
 ]

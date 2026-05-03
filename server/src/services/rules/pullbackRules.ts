@@ -317,3 +317,56 @@ export function rsiStructure(ctx: StrategyContext, params: Record<string, unknow
 
   return { pass: false, detail: `No RSI${period} structure detected on ${timeframe}` };
 }
+
+export function firstPullbackToEma(ctx: StrategyContext, params: Record<string, unknown>): RuleResult {
+  const timeframe       = paramStr(params, 'timeframe', '1D');
+  const emaPeriod       = paramNum(params, 'emaPeriod');
+  const lookback        = paramNum(params, 'lookback', 60);
+  const maxPriorTouches = paramNum(params, 'maxPriorTouches', 1);
+  const tf = ctx.timeframes[timeframe];
+  if (!tf || tf.candles.length < lookback + 1)
+    return { pass: false, detail: `Insufficient ${timeframe} data (need ${lookback + 1} bars)` };
+
+  const emaSeries = tf.ema[emaPeriod] ?? [];
+  if (emaSeries.length < lookback + 1)
+    return { pass: false, detail: `Insufficient EMA${emaPeriod} data on ${timeframe}` };
+
+  // Exclude the current (possibly in-progress) bar
+  const candles = tf.candles.slice(-lookback - 1, -1);
+  const emas    = emaSeries.slice(-lookback - 1, -1);
+
+  let touches = 0;
+  for (let i = 0; i < candles.length; i++) {
+    if (candles[i].close <= emas[i]) touches++;
+  }
+
+  const pass = touches <= maxPriorTouches;
+  return {
+    pass,
+    detail: `${touches} close(s) at or below EMA${emaPeriod} in last ${lookback} ${timeframe} bars (max allowed: ${maxPriorTouches})`,
+  };
+}
+
+export function priorRunStrength(ctx: StrategyContext, params: Record<string, unknown>): RuleResult {
+  const timeframe   = paramStr(params, 'timeframe', '1D');
+  const emaPeriod   = paramNum(params, 'emaPeriod');
+  const atrPeriod   = paramNum(params, 'atrPeriod', 14);
+  const lookback    = paramNum(params, 'lookback', 40);
+  const minDistance = paramNum(params, 'minDistance');
+  const maxDistance = paramNumOpt(params, 'maxDistance');
+  const tf = ctx.timeframes[timeframe];
+  if (!tf) return { pass: false, detail: `No ${timeframe} data` };
+
+  const sh  = findSwingHigh(ctx, timeframe, lookback);
+  const ema = last(tf.ema[emaPeriod]);
+  const atr = last(tf.atr[atrPeriod]);
+  if (!sh || ema == null || atr == null)
+    return { pass: false, detail: 'Insufficient data for prior run strength check' };
+
+  const distance = (sh.price - ema) / atr;
+  const pass = distance >= minDistance && (maxDistance == null || distance < maxDistance);
+  return {
+    pass,
+    detail: `Swing high $${sh.price.toFixed(2)} was ${distance.toFixed(1)}× ATR${atrPeriod} above EMA${emaPeriod} ($${ema.toFixed(2)})`,
+  };
+}

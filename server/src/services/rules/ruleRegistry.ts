@@ -33,6 +33,8 @@ export const RULES: Record<string, RuleFn> = {
   supportConfluence:   pullback.supportConfluence,
   rsiLevel:            pullback.rsiLevel,
   rsiStructure:        pullback.rsiStructure,
+  firstPullbackToEma:  pullback.firstPullbackToEma,
+  priorRunStrength:    pullback.priorRunStrength,
   // Trigger
   hourlyEmaCrossover:    trigger.hourlyEmaCrossover,
   hourlyStructureBreak:  trigger.hourlyStructureBreak,
