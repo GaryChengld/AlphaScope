@@ -5,6 +5,7 @@ import remarkGfm from 'remark-gfm';
 import TradingViewChart from '../components/TradingViewChart';
 import IndexChart from '../components/IndexChart';
 import WatchlistBookmark from '../components/WatchlistBookmark';
+import AiAnalysisTab from '../components/AiAnalysisTab';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -405,7 +406,7 @@ export default function StockDetail() {
   const [analysisLoading, setAnalysisLoading] = useState(false);
   const [loading, setLoading] = useState(true);
   const [period, setPeriod] = useState<Period>('1D');
-  const [tab, setTab] = useState<'chart' | 'fundamentals' | 'technicals' | 'analysis' | 'strategy' | 'news'>('chart');
+  const [tab, setTab] = useState<'chart' | 'fundamentals' | 'technicals' | 'analysis' | 'strategy' | 'ai' | 'news'>('chart');
 
   const [strategies, setStrategies] = useState<{ id: string; name: string; version: string }[] | null>(null);
   const [selectedStrategyId, setSelectedStrategyId] = useState<string>('');
@@ -460,14 +461,14 @@ export default function StockDetail() {
   const isStock = summary?.quoteType === 'EQUITY';
   const isEtf = summary?.quoteType === 'ETF';
   const strategyEligible = isStock || isEtf;
-  const visibleTabs = (['chart', 'fundamentals', 'technicals', 'analysis', 'strategy', 'news'] as const).filter((t) => {
-    if (t === 'strategy') return strategyEligible;
+  const visibleTabs = (['chart', 'fundamentals', 'technicals', 'analysis', 'strategy', 'ai', 'news'] as const).filter((t) => {
+    if (t === 'strategy' || t === 'ai') return strategyEligible;
     if (t === 'fundamentals' || t === 'analysis') return isStock;
     return true;
   });
   const activeTab = (() => {
     if ((tab === 'fundamentals' || tab === 'analysis') && !isStock) return 'technicals';
-    if (tab === 'strategy' && !strategyEligible) return 'technicals';
+    if ((tab === 'strategy' || tab === 'ai') && !strategyEligible) return 'technicals';
     return tab;
   })();
 
@@ -645,8 +646,13 @@ export default function StockDetail() {
             </div>
         </div>
 
+        {/* AI tab — full-height split pane */}
+        <div className={`flex flex-1 min-h-0 ${activeTab === 'ai' ? '' : 'hidden'}`}>
+          <AiAnalysisTab ticker={ticker} />
+        </div>
+
         {/* Other tab panels — scrollable */}
-        <div className={`px-5 py-4 overflow-y-auto flex-1 ${activeTab === 'chart' ? 'hidden' : ''}`}>
+        <div className={`px-5 py-4 overflow-y-auto flex-1 ${activeTab === 'chart' || activeTab === 'ai' ? 'hidden' : ''}`}>
           {activeTab === 'fundamentals' && (
             <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
 
