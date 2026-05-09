@@ -14,6 +14,7 @@ import { stockDetailRouter } from './routes/stockDetail';
 import { overviewRouter } from './routes/overview';
 import { strategyRouter } from './routes/strategyRoutes';
 import { scannerRouter, notificationRouter } from './routes/scannerRoutes';
+import { aiAnalysisRouter } from './routes/aiAnalysisRoutes';
 import { initScheduler } from './services/scannerScheduler';
 
 const app = express();
@@ -25,6 +26,7 @@ app.use('/api/watchlists', watchlistsRouter);
 app.use('/api/watchlists/:id/stocks', watchlistStocksRouter);
 app.use('/api/stocks', stockSearchRouter);
 app.use('/api/stocks', stockDetailRouter);
+app.use('/api/stocks', aiAnalysisRouter);
 app.use('/api/overview', overviewRouter);
 app.use('/api/strategies',     strategyRouter);
 app.use('/api/scanner',        scannerRouter);
