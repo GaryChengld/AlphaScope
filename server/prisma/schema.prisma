@@ -50,3 +50,13 @@ model NotificationTicker {
 
   @@unique([notificationId, ticker])
 }
+
+model AiAnalysis {
+  id          Int      @id @default(autoincrement())
+  ticker      String
+  timestamp   DateTime @default(now())
+  llmProvider String
+  content     String
+
+  @@index([ticker])
+}
