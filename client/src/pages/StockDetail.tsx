@@ -22,7 +22,7 @@ interface Technicals {
 
 interface Summary {
   symbol: string; shortName: string | null; quoteType: string | null; exchange: string | null;
-  marketState: string | null;
+  sector: string | null; industry: string | null; longBusinessSummary: string | null; marketState: string | null;
   price: number | null; change: number | null; changePct: number | null;
   preMarketPrice: number | null; preMarketChange: number | null; preMarketChangePct: number | null;
   postMarketPrice: number | null; postMarketChange: number | null; postMarketChangePct: number | null;
@@ -406,7 +406,7 @@ export default function StockDetail() {
   const [analysisLoading, setAnalysisLoading] = useState(false);
   const [loading, setLoading] = useState(true);
   const [period, setPeriod] = useState<Period>('1D');
-  const [tab, setTab] = useState<'chart' | 'fundamentals' | 'technicals' | 'analysis' | 'strategy' | 'ai' | 'news'>('chart');
+  const [tab, setTab] = useState<'chart' | 'company' | 'technicals' | 'analysis' | 'strategy' | 'ai' | 'news'>('chart');
 
   const [strategies, setStrategies] = useState<{ id: string; name: string; version: string }[] | null>(null);
   const [selectedStrategyId, setSelectedStrategyId] = useState<string>('');
@@ -461,13 +461,13 @@ export default function StockDetail() {
   const isStock = summary?.quoteType === 'EQUITY';
   const isEtf = summary?.quoteType === 'ETF';
   const strategyEligible = isStock || isEtf;
-  const visibleTabs = (['chart', 'fundamentals', 'technicals', 'analysis', 'strategy', 'ai', 'news'] as const).filter((t) => {
+  const visibleTabs = (['chart', 'company', 'technicals', 'analysis', 'strategy', 'ai', 'news'] as const).filter((t) => {
     if (t === 'strategy' || t === 'ai') return strategyEligible;
-    if (t === 'fundamentals' || t === 'analysis') return isStock;
+    if (t === 'company' || t === 'analysis') return isStock;
     return true;
   });
   const activeTab = (() => {
-    if ((tab === 'fundamentals' || tab === 'analysis') && !isStock) return 'technicals';
+    if ((tab === 'company' || tab === 'analysis') && !isStock) return 'technicals';
     if ((tab === 'strategy' || tab === 'ai') && !strategyEligible) return 'technicals';
     return tab;
   })();
@@ -539,6 +539,13 @@ export default function StockDetail() {
                 {summary?.exchange && <span className="text-xs text-gray-600">{summary.exchange}</span>}
                 <WatchlistBookmark ticker={summary?.symbol ?? ticker} exchange={summary?.exchange ?? null} />
               </div>
+              {(summary?.sector || summary?.industry) && (
+                <div className="mt-0.5 flex items-center gap-1.5 text-xs text-gray-500">
+                  {summary.sector && <span>{summary.sector}</span>}
+                  {summary.sector && summary.industry && <span className="text-gray-700">·</span>}
+                  {summary.industry && <span>{summary.industry}</span>}
+                </div>
+              )}
               <div className="flex items-baseline gap-3 mt-1 flex-wrap">
                 <span className="text-3xl font-semibold text-gray-100 tabular-nums">
                   {fmt(summary?.price ?? null)}
@@ -653,7 +660,16 @@ export default function StockDetail() {
 
         {/* Other tab panels — scrollable */}
         <div className={`px-5 py-4 overflow-y-auto flex-1 ${activeTab === 'chart' || activeTab === 'ai' ? 'hidden' : ''}`}>
-          {activeTab === 'fundamentals' && (
+          {activeTab === 'company' && (
+            <div className="flex flex-col gap-6">
+              {summary?.longBusinessSummary && (
+                <div>
+                  <div className="text-[10px] text-green-600 uppercase tracking-wider mb-1">Company Profile</div>
+                  <div className="border border-gray-800 rounded-lg overflow-hidden px-3 py-3">
+                    <p className="text-sm text-gray-300 leading-relaxed">{summary.longBusinessSummary}</p>
+                  </div>
+                </div>
+              )}
             <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
 
               <FundGroup title="Valuation">
@@ -714,6 +730,7 @@ export default function StockDetail() {
                 <StatRow label="Short Ratio"         value={fmt(summary?.shortRatio ?? null)} />
               </FundGroup>
 
+            </div>
             </div>
           )}
 

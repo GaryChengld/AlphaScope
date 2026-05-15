@@ -1,5 +1,5 @@
 -- DropIndex
-DROP INDEX "Notification_strategyId_date_key";
+DROP INDEX IF EXISTS "Notification_strategyId_date_key";
 
 -- CreateTable
 CREATE TABLE "AiAnalysis" (

@@ -106,7 +106,7 @@ export async function getStockSummary(ticker: string): Promise<Record<string, an
   const [quoteResult, summaryResult, historyResult] = await Promise.allSettled([
     (yf.quote as any)(ticker),
     (yf.quoteSummary as any)(ticker, {
-      modules: ['summaryDetail', 'defaultKeyStatistics', 'calendarEvents', 'financialData'],
+      modules: ['summaryDetail', 'defaultKeyStatistics', 'calendarEvents', 'financialData', 'assetProfile'],
     }, { validateResult: false }),
     (yf.historical as any)(ticker, { period1: subDate(300), period2: today(), interval: '1d' }),
   ]);
@@ -126,6 +126,8 @@ export async function getStockSummary(ticker: string): Promise<Record<string, an
   const ce = s.calendarEvents       ?? {};
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const fd = s.financialData        ?? {};
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const ap = s.assetProfile         ?? {};
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const candles = (h as any[]).filter((c) => c.close != null);
@@ -140,6 +142,9 @@ export async function getStockSummary(ticker: string): Promise<Record<string, an
     shortName: q.shortName ?? q.longName ?? null,
     quoteType: q.quoteType ?? null,
     exchange:  q.fullExchangeName ?? q.exchange ?? null,
+    sector:              ap.sector              ?? null,
+    industry:            ap.industry            ?? null,
+    longBusinessSummary: ap.longBusinessSummary ?? null,
     marketState: q.marketState ?? null,
     price:     q.regularMarketPrice         ?? null,
     change:    q.regularMarketChange        ?? null,

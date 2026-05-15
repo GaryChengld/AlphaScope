@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { Trash2, Plus } from 'lucide-react';
@@ -122,8 +122,12 @@ export default function AiAnalysisTab({ ticker }: { ticker: string }) {
   const [selectedRecord, setSelectedRecord] = useState<AiAnalysisFull | null>(null);
   const [contentLoading, setContentLoading] = useState(false);
   const [showModal, setShowModal] = useState(false);
+  const contentPaneRef = useRef<HTMLDivElement>(null);
+  const tickerRef = useRef(ticker);
+  useEffect(() => { tickerRef.current = ticker; }, [ticker]);
 
   useEffect(() => {
+    if (contentPaneRef.current) contentPaneRef.current.scrollTop = 0;
     setLoading(true);
     setRecords([]);
     setSelectedId(null);
@@ -139,17 +143,18 @@ export default function AiAnalysisTab({ ticker }: { ticker: string }) {
   }, [ticker]);
 
   useEffect(() => {
+    if (contentPaneRef.current) contentPaneRef.current.scrollTop = 0;
     if (selectedId == null) {
       setSelectedRecord(null);
       return;
     }
     setContentLoading(true);
-    fetch(`/api/stocks/${encodeURIComponent(ticker)}/ai-analysis/${selectedId}`)
+    fetch(`/api/stocks/${encodeURIComponent(tickerRef.current)}/ai-analysis/${selectedId}`)
       .then((r) => (r.ok ? r.json() : null))
       .then((data: AiAnalysisFull | null) => { if (data) setSelectedRecord(data); })
       .catch(() => {})
       .finally(() => setContentLoading(false));
-  }, [selectedId, ticker]);
+  }, [selectedId]); // ticker intentionally omitted — ticker effect resets selectedId first
 
   const handleDelete = async (id: number) => {
     await fetch(`/api/stocks/${encodeURIComponent(ticker)}/ai-analysis/${id}`, {
@@ -177,7 +182,7 @@ export default function AiAnalysisTab({ ticker }: { ticker: string }) {
   };
 
   return (
-    <div className="flex h-full min-h-0">
+    <div className="flex h-full min-h-0 w-full">
       {/* Left: analysis list */}
       <div className="w-64 shrink-0 border-r border-gray-800 flex flex-col">
         <div className="flex items-center justify-between px-3 py-2.5 border-b border-gray-800 shrink-0">
@@ -243,7 +248,7 @@ export default function AiAnalysisTab({ ticker }: { ticker: string }) {
       </div>
 
       {/* Right: content pane */}
-      <div className="flex-1 min-w-0 overflow-y-auto px-5 py-4">
+      <div ref={contentPaneRef} className="flex-1 min-w-0 overflow-y-auto px-5 py-4">
         {!loading && selectedId == null && (
           <p className="text-sm text-gray-500">
             {records.length === 0
@@ -267,7 +272,7 @@ export default function AiAnalysisTab({ ticker }: { ticker: string }) {
               <span className="text-sm font-medium text-gray-300">{selectedRecord.llmProvider}</span>
               <span className="text-xs text-gray-600">{fmtTimestamp(selectedRecord.timestamp)}</span>
             </div>
-            <div className="prose prose-invert prose-sm max-w-none prose-h1:text-base prose-h1:text-blue-400 prose-h1:mt-0 prose-h1:mb-1 prose-h2:text-sm prose-h2:mt-4 prose-h2:mb-2 prose-h3:text-sm prose-h3:mt-3 prose-h3:mb-1">
+            <div className="prose prose-invert max-w-none prose-h1:text-lg prose-h1:text-blue-400 prose-h1:mt-0 prose-h1:mb-1 prose-h2:text-base prose-h2:mt-4 prose-h2:mb-2 prose-h3:text-sm prose-h3:mt-3 prose-h3:mb-1">
               <ReactMarkdown remarkPlugins={[remarkGfm]}>{selectedRecord.content}</ReactMarkdown>
             </div>
           </div>

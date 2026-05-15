@@ -47,7 +47,14 @@
       "Bash(node -e ' *)",
       "Bash(node --import tsx/esm -e ' *)",
       "PowerShell(\\(Get-Item \"C:\\\\Workspaces\\\\AlphaScope\\\\server\\\\src\\\\services\\\\rules\\\\ruleRegistry.ts\"\\).LastWriteTime = Get-Date; Start-Sleep 5; Invoke-RestMethod http://localhost:3001/api/strategies/first_pullback_50day/evaluate/AAPL -ErrorAction SilentlyContinue | Select-Object -First 3)",
-      "Bash(taskkill /PID 60252 /T /F)"
+      "Bash(taskkill /PID 60252 /T /F)",
+      "Bash(echo \"Exit: $?\")",
+      "Bash(mkdir -p \"C:/Workspaces/AlphaScope/.worktrees/feature-ai-analysis-tab/client/src/lib\")",
+      "Bash(cp \"C:/Workspaces/AlphaScope/client/src/lib/socket.ts\" \"C:/Workspaces/AlphaScope/.worktrees/feature-ai-analysis-tab/client/src/lib/socket.ts\")",
+      "Bash(git stash *)",
+      "Bash(git merge *)",
+      "Bash(echo \"Server: $?\")",
+      "Bash(echo \"Client: $?\")"
     ]
   }
 }
