@@ -406,6 +406,7 @@ export default function StockDetail() {
   const [analysisLoading, setAnalysisLoading] = useState(false);
   const [loading, setLoading] = useState(true);
   const [period, setPeriod] = useState<Period>('1D');
+  const [chartProvider, setChartProvider] = useState<'tradingview' | 'lightweight'>('tradingview');
   const [tab, setTab] = useState<'chart' | 'company' | 'technicals' | 'analysis' | 'strategy' | 'ai' | 'news'>('chart');
 
   const [strategies, setStrategies] = useState<{ id: string; name: string; version: string }[] | null>(null);
@@ -612,23 +613,42 @@ export default function StockDetail() {
         {/* Chart tab — always mounted to prevent re-init on tab switch; hidden via CSS when inactive */}
         <div className={`flex flex-1 min-h-0 ${activeTab === 'chart' ? '' : 'hidden'}`}>
             <div className="flex flex-col flex-1 min-w-0 p-3 gap-2">
-              <div className="flex gap-1 shrink-0">
-                {PERIODS.map((p) => (
-                  <button
-                    key={p}
-                    onClick={() => setPeriod(p)}
-                    className={`px-3 py-1 text-xs rounded font-medium transition-colors border
-                      ${period === p
-                        ? 'bg-blue-500/20 text-blue-400 border-blue-500/30'
-                        : 'text-gray-500 hover:text-gray-300 hover:bg-gray-800 border-transparent'
-                      }`}
-                  >
-                    {p.toUpperCase()}
-                  </button>
-                ))}
+              <div className="flex items-center justify-between shrink-0">
+                <div className="flex gap-1">
+                  {PERIODS.map((p) => (
+                    <button
+                      key={p}
+                      onClick={() => setPeriod(p)}
+                      className={`px-3 py-1 text-xs rounded font-medium transition-colors border
+                        ${period === p
+                          ? 'bg-blue-500/20 text-blue-400 border-blue-500/30'
+                          : 'text-gray-500 hover:text-gray-300 hover:bg-gray-800 border-transparent'
+                        }`}
+                    >
+                      {p.toUpperCase()}
+                    </button>
+                  ))}
+                </div>
+                {!isIndex && (
+                  <div className="flex rounded border border-gray-700 overflow-hidden">
+                    {(['tradingview', 'lightweight'] as const).map((provider) => (
+                      <button
+                        key={provider}
+                        onClick={() => setChartProvider(provider)}
+                        className={`px-2.5 py-1 text-xs font-medium transition-colors
+                          ${chartProvider === provider
+                            ? 'bg-gray-700 text-gray-100'
+                            : 'text-gray-500 hover:text-gray-300 hover:bg-gray-800'
+                          }`}
+                      >
+                        {provider === 'tradingview' ? 'TV' : 'LW'}
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
               <div className="flex-1 min-h-0 rounded-lg overflow-hidden bg-gray-900">
-                {isIndex
+                {isIndex || chartProvider === 'lightweight'
                   ? <IndexChart ticker={ticker} period={period} />
                   : <TradingViewChart symbol={ticker} period={period} />
                 }

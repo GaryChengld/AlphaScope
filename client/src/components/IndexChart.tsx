@@ -2,6 +2,23 @@ import { useEffect, useRef } from 'react';
 import { createChart, ColorType, CandlestickSeries, HistogramSeries, LineSeries, type UTCTimestamp } from 'lightweight-charts';
 import { RSI } from 'technicalindicators';
 
+// lightweight-charts has no timezone option — shift intraday UTC timestamps to
+// NY wall-clock time so the axis reads "09:30" instead of "13:30".
+const NY_FMT = new Intl.DateTimeFormat('en-US', {
+  timeZone: 'America/New_York',
+  year: 'numeric', month: '2-digit', day: '2-digit',
+  hour: '2-digit', minute: '2-digit', second: '2-digit',
+  hour12: false,
+});
+
+function toNYTimestamp(utcSeconds: number): UTCTimestamp {
+  const parts = NY_FMT.formatToParts(new Date(utcSeconds * 1000));
+  const get = (t: string) => parseInt(parts.find((p) => p.type === t)?.value ?? '0');
+  return Math.floor(
+    Date.UTC(get('year'), get('month') - 1, get('day'), get('hour'), get('minute'), get('second')) / 1000
+  ) as UTCTimestamp;
+}
+
 interface Candle {
   time: UTCTimestamp | string;
   open: number;
@@ -83,17 +100,21 @@ export default function IndexChart({ ticker, period }: IndexChartProps) {
         .then((r) => r.ok ? r.json() : [])
         .then((data: Candle[]) => {
           if (data.length === 0) return;
-          candleSeries.setData(data);
+          const mapped = data.map((c) => ({
+            ...c,
+            time: typeof c.time === 'number' ? toNYTimestamp(c.time) : c.time,
+          }));
+          candleSeries.setData(mapped);
 
-          volumeSeries.setData(data.map((c) => ({
+          volumeSeries.setData(mapped.map((c) => ({
             time: c.time,
             value: c.volume,
             color: c.close >= c.open ? '#4ade8033' : '#f8717133',
           })));
 
-          const closes = data.map((c) => c.close);
+          const closes = mapped.map((c) => c.close);
           const rsiValues = RSI.calculate({ period: 14, values: closes });
-          const rsiData = data.slice(data.length - rsiValues.length).map((c, i) => ({
+          const rsiData = mapped.slice(mapped.length - rsiValues.length).map((c, i) => ({
             time: c.time,
             value: rsiValues[i],
           }));
