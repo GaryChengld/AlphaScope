@@ -17,11 +17,11 @@ interface SectorPrice {
 }
 
 interface EconomicEvent {
-  time: string;
+  date: string;
   event: string;
   actual: number | null;
-  estimate: number | null;
   prev: number | null;
+  change: number | null;
   unit: string;
 }
 
@@ -80,16 +80,19 @@ function formatWeekRange(monday: Date): string {
   return `${fmt(monday)} – ${fmt(sunday)}, ${sunday.getFullYear()}`;
 }
 
-function formatEconomicTime(time: string): string {
-  const date = new Date(time.replace(' ', 'T') + 'Z');
-  return date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }) +
-    ', ' +
-    date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false });
+function formatEconomicDate(date: string): string {
+  const d = new Date(date + 'T00:00:00');
+  return d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
 }
 
 function formatWithUnit(value: number | null, unit: string): string {
   if (value === null) return '—';
   return `${value}${unit}`;
+}
+
+function formatSignedWithUnit(value: number | null, unit: string): string {
+  if (value === null) return '—';
+  return `${value >= 0 ? '+' : ''}${value}${unit}`;
 }
 
 function formatRevenue(value: number | null): string {
@@ -269,28 +272,34 @@ function EconomicTable({ events }: { events: EconomicEvent[] | null }) {
   }
 
   if (events.length === 0) {
-    return <p className="text-sm text-gray-500 py-6 text-center">No major US economic events this week.</p>;
+    return <p className="text-sm text-gray-500 py-6 text-center">No major US economic releases this week.</p>;
   }
 
   return (
     <table className="w-full border-collapse">
       <thead>
         <tr className="bg-blue-950/60">
-          <th className="text-xs font-semibold text-blue-300 uppercase tracking-wider text-left py-1.5 pl-3 pr-3">Date/Time</th>
-          <th className="text-xs font-semibold text-blue-300 uppercase tracking-wider text-left py-1.5 pr-3">Activity</th>
+          <th className="text-xs font-semibold text-blue-300 uppercase tracking-wider text-left py-1.5 pl-3 pr-3">Date</th>
+          <th className="text-xs font-semibold text-blue-300 uppercase tracking-wider text-left py-1.5 pr-3">Release</th>
           <th className="text-xs font-semibold text-blue-300 uppercase tracking-wider text-right py-1.5 pr-3">Actual</th>
-          <th className="text-xs font-semibold text-blue-300 uppercase tracking-wider text-right py-1.5 pr-3">Forecast</th>
           <th className="text-xs font-semibold text-blue-300 uppercase tracking-wider text-right py-1.5 pr-3">Prior</th>
+          <th className="text-xs font-semibold text-blue-300 uppercase tracking-wider text-right py-1.5 pr-3">Change</th>
         </tr>
       </thead>
       <tbody>
         {events.map((ev, i) => (
-          <tr key={`${ev.time}-${ev.event}`} className={`border-b border-gray-800 ${i % 2 === 0 ? 'bg-gray-900/50' : ''}`}>
-            <td className="text-xs text-gray-300 py-1.5 pl-3 pr-3 whitespace-nowrap">{formatEconomicTime(ev.time)}</td>
+          <tr key={`${ev.date}-${ev.event}`} className={`border-b border-gray-800 ${i % 2 === 0 ? 'bg-gray-900/50' : ''}`}>
+            <td className="text-xs text-gray-300 py-1.5 pl-3 pr-3 whitespace-nowrap">{formatEconomicDate(ev.date)}</td>
             <td className="text-xs text-gray-300 py-1.5 pr-3">{ev.event}</td>
             <td className="text-xs text-gray-300 py-1.5 pr-3 text-right tabular-nums">{formatWithUnit(ev.actual, ev.unit)}</td>
-            <td className="text-xs text-gray-300 py-1.5 pr-3 text-right tabular-nums">{formatWithUnit(ev.estimate, ev.unit)}</td>
             <td className="text-xs text-gray-300 py-1.5 pr-3 text-right tabular-nums">{formatWithUnit(ev.prev, ev.unit)}</td>
+            <td
+              className={`text-xs py-1.5 pr-3 text-right tabular-nums ${
+                ev.change === null ? 'text-gray-500' : ev.change >= 0 ? 'text-green-400' : 'text-red-400'
+              }`}
+            >
+              {formatSignedWithUnit(ev.change, ev.unit)}
+            </td>
           </tr>
         ))}
       </tbody>

@@ -3,7 +3,14 @@
 ## Goal
 
 Add a weekly calendar section below the chart/sectors area in the Overview page.
-Shows US economic events (Finnhub) and earnings for watchlist stocks (Yahoo Finance2).
+Shows US economic releases and earnings for watchlist stocks.
+
+> **Revision (task 21):** The economic source was migrated from Finnhub to the
+> **FRED API** after Finnhub moved `/calendar/economic` behind a premium plan
+> (FMP and Trading Economics likewise gated theirs). Earnings switched to
+> Finnhub's `/calendar/earnings` as the primary source with a Yahoo Finance
+> `calendarEvents` fallback. The sections below reflect the current implementation;
+> see `21-fred-economic-calendar.md` for the economic migration detail.
 
 ---
 
@@ -14,8 +21,8 @@ Shows US economic events (Finnhub) and earnings for watchlist stocks (Yahoo Fina
 │  [Today]  [📅]  <  Apr 13 – Apr 19, 2026  >             │  ← WeekNav
 ├───────────────────────────┬──────────────────────────────┤
 │  ECONOMIC DATA            │  EARNINGS                    │
-│  Date/Time | Activity     │  Date/Time | Sym | Company   │
-│  Actual | Fcst | Prior    │  Est EPS | Act EPS           │
+│  Date | Release           │  Date | Sym | Company        │
+│  Actual | Prior | Change  │  Est EPS | Act EPS           │
 │                           │  Est Rev | Act Rev           │
 └───────────────────────────┴──────────────────────────────┘
 ```
@@ -64,23 +71,47 @@ Style: same `border border-gray-800 bg-gray-900` pill buttons as the rest of the
 
 ### `calendarService.ts` — two exported functions
 
-#### `getEconomicEvents(from: string, to: string)`
+#### `getEconomicEvents(from: string, to: string)` — FRED
 
-- Calls Finnhub: `GET /calendar/economic?from={from}&to={to}&token={FINNHUB_API_KEY}`
-- Uses the same `FINNHUB_API_KEY` pattern as `newsService.ts`
-- Filters response: `country === 'US'` AND `impact === 'high'`
-- Sorts by `time` ascending
+FRED (St. Louis Fed) is series-based, not a calendar, so we curate a small
+`FRED_EVENTS` list of high-impact US releases and assemble a weekly view:
+
+```ts
+interface FredSeriesConfig {
+  seriesId: string;   // e.g. 'CPIAUCSL'
+  releaseId: number;  // FRED release id (verified via /fred/series/release)
+  name: string;       // 'CPI (YoY)'
+  display: 'level' | 'mom_change' | 'mom_pct' | 'yoy_pct';
+  unit: string;       // '%' | 'K'
+}
+```
+
+Curated set: CPI + Core CPI (yoy_pct, release 10), Nonfarm Payrolls (mom_change,
+release 50) + Unemployment Rate (level, release 50), PCE Price Index (yoy_pct,
+release 54), Real GDP (level, release 53), Retail Sales (mom_pct, release 9),
+Fed Funds Rate (level, release 18).
+
+Per event (all in parallel via `Promise.allSettled`):
+1. `GET /fred/release/dates?release_id=…&realtime_start={from}&realtime_end={to}&include_release_dates_with_no_data=true` — keep dates within `[from, to]`. Cached per `releaseId` (CPI+Core share 10; NFP+Unemployment share 50).
+2. If a release date lands in the window, `GET /fred/series/observations?series_id=…&sort_order=desc&limit=14` (14 = enough history for YoY).
+3. Derive `{ actual, prev }` from the newest-first values per `display` mode; `change = actual − prev`. A release dated after today is shown pending (`actual: null`).
+
+- Uses `FRED_API_KEY` (missing → `console.warn` + `[]`).
+- **No consensus forecast** — FRED does not provide one.
 - Returns:
   ```ts
   interface EconomicEvent {
-    time: string;      // "2026-04-17 08:30:00"
-    event: string;     // "Initial Jobless Claims"
+    date: string;          // release date "2026-07-02"
+    event: string;         // "Nonfarm Payrolls (MoM)"
     actual: number | null;
-    estimate: number | null;
     prev: number | null;
-    unit: string;      // "K", "%", "B", etc.
+    change: number | null; // actual − prev
+    unit: string;          // "%" | "K"
   }
   ```
+
+> **Known quirk:** Fed Funds Rate maps to the H.15 release, which publishes
+> weekly, so it appears in most weeks (usually `change 0`).
 
 #### `getEarningsForWeek(from: string, to: string)`
 
@@ -94,28 +125,28 @@ const tickers = rows.map(r => r.ticker);
 - Batch call `yf.quote(tickers)` (same pattern as `getLivePrices` using `as any`)
 - Keep only those where `q.quoteType === 'EQUITY'`
 
-**Step 3 — Fetch earnings data per EQUITY ticker:**
-- Call `yf.quoteSummary(ticker, { modules: ['calendarEvents', 'earnings', 'incomeStatementHistory'] }, { validateResult: false })`
-- From `calendarEvents.earnings.earningsDate`: check if any date falls in `[from, to]` range
-- If yes, include in results
+**Step 3 — Earnings dates (Finnhub primary, Yahoo fallback):**
 
-**Step 4 — Build response:**
+1. **Primary — Finnhub `/calendar/earnings?from={from}&to={to}`:** filter the returned `earningsCalendar` to our EQUITY tickers. If any match, map them and return (real date + EPS/revenue estimate & actual straight from Finnhub).
+2. **Fallback — Yahoo `calendarEvents`:** only if Finnhub returned none of our tickers for the window. For each EQUITY ticker (concurrent `Promise.allSettled`), call `yf.quoteSummary(ticker, { modules: ['calendarEvents'] }, { validateResult: false })` and keep `calendarEvents.earnings.earningsDate` entries within `[from, to]`; estimates from `earningsAverage` / `revenueAverage`.
+
+> **Do NOT** approximate earnings dates from `earningsHistory` quarter-ends + a
+> fixed offset — that clusters every company sharing a fiscal-quarter end onto one
+> fake date (the original bug: MU/COST/ACN/ADBE/ORCL all landed on the same day).
+> `calendarEvents.earnings.earningsDate` is the actual upcoming date.
+
+**Step 4 — Response shape:**
 ```ts
 interface EarningsEvent {
-  date: string;              // "2026-04-17"
-  time: string | null;       // earnings time if known ("BMO"/"AMC") — from calendarEvents if available
+  date: string;              // "2026-06-18"
   ticker: string;
   shortName: string | null;
-  epsEstimate: number | null;   // calendarEvents.earnings.earningsAverage
-  epsActual: number | null;     // earnings.earningsChart.quarterly[latest].actual (if date is past)
-  revenueEstimate: number | null; // calendarEvents.earnings.revenueAverage
-  revenueActual: number | null;   // incomeStatementHistory.incomeStatementHistory[0].totalRevenue (if past)
+  epsEstimate: number | null;
+  epsActual: number | null;
+  revenueEstimate: number | null;
+  revenueActual: number | null;
 }
 ```
-
-> **Note on revenueActual:** `incomeStatementHistory` gives quarterly revenue. Match the most recent quarter to the earnings date — if the date is past and within the same quarter, use it; otherwise `null`.
-
-> **Note on parallel fetching:** Run `yf.quoteSummary` calls concurrently with `Promise.allSettled` to avoid one failing ticker blocking the rest.
 
 ### New endpoints in `overview.ts`
 
@@ -170,12 +201,12 @@ Style: `text-xs font-medium` buttons with `border border-gray-700 bg-gray-900 ho
 
 ### `EconomicTable` component
 
-- Props: `events: EconomicEvent[]`
-- Loading: show skeleton rows while `events.length === 0`
-- Table columns: **Date/Time** | **Activity** | **Actual** | **Forecast** | **Prior**
-- Format time: `"Thu Apr 17, 08:30"` from the `time` string
-- Color actual vs estimate: green if actual > estimate (growth), red if below — but note some indicators (like jobless claims) are inverse; skip coloring to keep it simple
-- Empty state: "No major US economic events this week"
+- Props: `events: EconomicEvent[] | null` (null = loading)
+- Loading: show skeleton rows while `events === null`
+- Table columns: **Date** | **Release** | **Actual** | **Prior** | **Change**
+- Format date: `"Thu, Jul 2"` from the `date` string
+- Color the **Change** cell: green if `≥ 0`, red if `< 0`, gray if null (neutral — no good/bad judgement on the underlying metric)
+- Empty state: "No major US economic releases this week"
 
 ### `EarningsTable` component
 
@@ -196,11 +227,11 @@ Add a full-width divider (`-mx-4 border-b border-gray-800`) between the chart/se
 
 ## Tasks
 
-- [ ] `calendarService.ts` — `getEconomicEvents` + `getEarningsForWeek`
-- [ ] Add endpoints to `overview.ts` + mount
-- [ ] Client date helpers (`mondayOf`, `formatWeekRange`, `addDays`, `toDateStr`)
-- [ ] `WeekNav` component
-- [ ] `EconomicTable` component
-- [ ] `EarningsTable` component
-- [ ] Wire state + fetches into `Overview.tsx`
-- [ ] Add section divider + layout in `Overview.tsx`
+- [x] `calendarService.ts` — `getEconomicEvents` (FRED) + `getEarningsForWeek` (Finnhub → Yahoo fallback)
+- [x] Add endpoints to `overview.ts` + mount
+- [x] Client date helpers (`mondayOf`, `formatWeekRange`, `addDays`, `toDateStr`)
+- [x] `WeekNav` component
+- [x] `EconomicTable` component
+- [x] `EarningsTable` component
+- [x] Wire state + fetches into `Overview.tsx`
+- [x] Add section divider + layout in `Overview.tsx`

@@ -31,7 +31,8 @@ overviewRouter.get('/economic', async (req: Request, res: Response) => {
     res.json(await getEconomicEvents(from, to));
   } catch (err) {
     console.error('[overview] economic error', err);
-    res.status(502).json({ error: 'failed to fetch economic events' });
+    const message = err instanceof Error ? err.message : 'failed to fetch economic events';
+    res.status(502).json({ error: message });
   }
 });
 

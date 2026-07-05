@@ -14,6 +14,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - **Database:** SQLite via Prisma ORM
 - **AI:** Multi-provider LLM support — Google Gemini, OpenAI, Claude (persistent chat session, lazy-initialized)
 - **Market Data:** `yahoo-finance2` (on-demand 5-min OHLC + daily candles for SPX, SPY, and 11 sector ETFs)
+- **Calendar Data:** Finnhub (company news + earnings calendar), FRED / St. Louis Fed (economic releases — free, no plan gating)
 - **Indicators:** `technicalindicators` library (VWAP, SMA, RSI, ATR)
 - **Charts:** `lightweight-charts` v5 (SPX candlestick chart with VWAP, volume, RSI pane)
 - **Scheduler:** `node-cron` v3 (strategy scanner, fires at 10:00/12:00/14:00/16:00 ET on market days)
@@ -44,6 +45,8 @@ server/src/
   services/
     stockService.ts     # getStockSummary, getStockCandles, getLivePrices, computeTechnicals
     newsService.ts      # getStockNews (Finnhub)
+    calendarService.ts  # getEconomicEvents (FRED curated releases) + getEarningsForWeek (Finnhub calendar → Yahoo calendarEvents fallback)
+    overviewService.ts  # getMarketIndicators, getSectorPrices
     stockSearchService.ts  # searchStocks
     watchlistService.ts # watchlist + stock CRUD (listWatchlists, createWatchlist, getStocksWithPrices, addStock, …)
     scannerService.ts   # triggerScan() fire-and-forget + private runScan(); _scanning flag prevents concurrent runs; skips index tickers (^)
@@ -67,6 +70,7 @@ server/src/
     watchlistStocks.ts
     strategyRoutes.ts
     scannerRoutes.ts    # scannerRouter (POST /run) + notificationRouter (GET, PATCH /:id/read, DELETE /:id)
+    overview.ts         # overviewRouter — /markets, /sectors, /economic, /earnings
   socket/
     index.ts            # initSocket() + getIo() singleton export
   index.ts
@@ -110,6 +114,14 @@ The scanner runs all enabled strategies against every stock and ETF in every wat
 
 **Frontend:** `Shell.tsx` owns notification state (fetch on mount + socket subscription). `Topbar.tsx` shows unread badge. `RightPanel.tsx` renders accordion cards — collapsed by default, one expanded at a time; "Run Scan" button; trash delete per card. Clicking a ticker navigates to `/stock/:ticker` with Router state `{ ticker, notificationMarkdown, strategyId }`; `StockDetail.tsx` reads this state and pre-populates the Strategy tab with the stored markdown (no re-evaluation).
 
+### Overview Calendar (Economic & Earnings)
+
+The Overview page shows a weekly calendar (`Overview.tsx` — `EconomicTable` + `EarningsTable`), fed by `calendarService.ts` via `GET /api/overview/economic` and `/earnings` (both take `?from=&to=` = the selected Mon–Sun week).
+
+**Economic events — FRED.** Finnhub/FMP/Trading Economics all moved their economic calendars behind paid plans, so economic data comes from the **FRED API** (St. Louis Fed — free, no plan gating). FRED is series-based, not a calendar, so `getEconomicEvents` curates a small `FRED_EVENTS` list of high-impact US releases (`{ seriesId, releaseId, name, display, unit }`). For each: look up whether the release fired in `[from, to]` via `/fred/release/dates` (cached per `releaseId` — CPI+Core share release 10, NFP+Unemployment share 50), then pull `/fred/series/observations` (limit 14) and derive a headline via `display` mode — `level`, `mom_change`, `mom_pct`, or `yoy_pct`. Releases dated after today are shown pending (`actual: null`). Returns `EconomicEvent { date, event, actual, prev, change, unit }` — **no consensus forecast** (FRED has none), so the panel columns are Date / Release / Actual / Prior / Change. Needs `FRED_API_KEY`; missing key → warn + `[]`. Known quirk: Fed Funds Rate maps to the H.15 release, which publishes weekly, so it appears most weeks (usually `change 0`).
+
+**Earnings — Finnhub primary, Yahoo fallback.** `getEarningsForWeek` pulls the DB's distinct watchlist tickers, keeps EQUITY-type via `yf.quote`, then: (1) queries Finnhub `/calendar/earnings` filtered to those tickers; (2) if Finnhub returns none of our tickers for the window, falls back to Yahoo `quoteSummary` `calendarEvents.earnings.earningsDate` (the **actual** upcoming date — do NOT use `earningsHistory + N days`, which wrongly clusters same-fiscal-quarter companies onto one fake date). Returns `EarningsEvent { date, ticker, shortName, epsEstimate, epsActual, revenueEstimate, revenueActual }`. Needs `FINNHUB_API_KEY` for path 1.
+
 ### Sidebar Stock List Behaviour
 
 - **Column-header sorting:** Clicking Symbol / Price / Change / Chg% cycles asc → desc → normal. Active column shows a `ChevronUp`/`ChevronDown` icon. Only one column sorted at a time; clicking a different column resets the previous.
@@ -126,4 +138,4 @@ The scanner runs all enabled strategies against every stock and ETF in every wat
 
 ## Environment & Secrets
 
-Store API keys in `.env` (gitignored). Required keys: `GEMINI_API_KEY`, `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`. The strategy engine reads `STRATEGIES_DIR` (path to `specs/strategies/`) from `server/.env`.
+Store API keys in `.env` (gitignored). Keys: `GEMINI_API_KEY`, `OPENAI_API_KEY`, `ANTHROPIC_API_KEY` (LLM providers); `FINNHUB_API_KEY` (company news + earnings calendar); `FRED_API_KEY` (economic releases — free key from the St. Louis Fed). The strategy engine reads `STRATEGIES_DIR` (path to `specs/strategies/`) from `server/.env`.
