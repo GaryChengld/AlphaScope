@@ -50,7 +50,12 @@ export default function Shell() {
         return [updated, ...prev];
       });
     });
-    socket.on('scanner:started',  () => setScanRunning(true));
+    socket.on('scanner:started',  () => {
+      setScanRunning(true);
+      // Server wipes all notifications at the start of a scan — clear the panel
+      // so new results stream in from a clean slate.
+      setNotifications([]);
+    });
     socket.on('scanner:complete', () => {
       setScanRunning(false);
       // Refetch in case any notification:update events were missed

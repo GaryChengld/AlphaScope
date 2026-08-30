@@ -50,6 +50,11 @@ async function filterScannable(raw: string[]): Promise<string[]> {
 }
 
 async function runScan(): Promise<ScanSummary> {
+  // Each scan starts from a clean slate — wipe all prior notifications
+  // (NotificationTicker rows cascade-delete) so the panel only ever shows the
+  // most recent run's results.
+  await prisma.notification.deleteMany();
+
   const rows       = await prisma.stock.findMany({ select: { ticker: true } });
   const rawTickers = [...new Set(rows.map(r => r.ticker))].filter(t => !t.startsWith('^'));
   const tickers    = await filterScannable(rawTickers);
