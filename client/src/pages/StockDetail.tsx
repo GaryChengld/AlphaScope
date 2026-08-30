@@ -649,7 +649,7 @@ export default function StockDetail() {
               </div>
               <div className="flex-1 min-h-0 rounded-lg overflow-hidden bg-gray-900">
                 {isIndex || chartProvider === 'lightweight'
-                  ? <IndexChart ticker={ticker} period={period} />
+                  ? <IndexChart ticker={ticker} period={period} active={activeTab === 'chart'} />
                   : <TradingViewChart symbol={ticker} period={period} />
                 }
               </div>

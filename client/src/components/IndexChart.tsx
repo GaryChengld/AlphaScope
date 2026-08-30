@@ -1,5 +1,5 @@
-import { useEffect, useRef } from 'react';
-import { createChart, ColorType, CandlestickSeries, HistogramSeries, LineSeries, type UTCTimestamp } from 'lightweight-charts';
+import { useEffect, useLayoutEffect, useRef } from 'react';
+import { createChart, ColorType, CandlestickSeries, HistogramSeries, LineSeries, type IChartApi, type UTCTimestamp } from 'lightweight-charts';
 import { RSI } from 'technicalindicators';
 
 // lightweight-charts has no timezone option — shift intraday UTC timestamps to
@@ -31,6 +31,10 @@ interface Candle {
 interface IndexChartProps {
   ticker: string;
   period: string;
+  /** Whether the chart's tab is currently visible. When it flips true the chart
+   *  re-measures its container — it may have been created while `display:none`
+   *  (zero width) inside an inactive tab. Defaults to true. */
+  active?: boolean;
 }
 
 const CHART_OPTS = {
@@ -48,8 +52,9 @@ const CHART_OPTS = {
   timeScale: { borderColor: '#374151', timeVisible: true },
 };
 
-export default function IndexChart({ ticker, period }: IndexChartProps) {
+export default function IndexChart({ ticker, period, active = true }: IndexChartProps) {
   const containerRef = useRef<HTMLDivElement>(null);
+  const chartRef = useRef<IChartApi | null>(null);
 
   useEffect(() => {
     const el = containerRef.current;
@@ -60,6 +65,7 @@ export default function IndexChart({ ticker, period }: IndexChartProps) {
       width: el.clientWidth,
       height: el.clientHeight,
     });
+    chartRef.current = chart;
 
     const candleSeries = chart.addSeries(CandlestickSeries, {
       upColor: '#4ade80', downColor: '#f87171',
@@ -91,7 +97,10 @@ export default function IndexChart({ ticker, period }: IndexChartProps) {
     }
 
     const observer = new ResizeObserver(() => {
-      chart.applyOptions({ width: el.clientWidth, height: el.clientHeight });
+      // Skip zero-size notifications (fired when the tab is hidden via
+      // `display:none`) so the chart is never locked to a 0-width canvas.
+      const w = el.clientWidth, h = el.clientHeight;
+      if (w > 0 && h > 0) chart.applyOptions({ width: w, height: h });
     });
     observer.observe(el);
 
@@ -131,8 +140,25 @@ export default function IndexChart({ ticker, period }: IndexChartProps) {
       clearInterval(timer);
       observer.disconnect();
       chart.remove();
+      chartRef.current = null;
     };
   }, [ticker, period]);
+
+  // When the tab becomes visible, re-measure the container. If the chart was
+  // created while the tab was hidden (display:none → zero width), the
+  // ResizeObserver's show notification isn't reliably delivered; this guarantees
+  // a correct full-width fit. useLayoutEffect applies it before paint (no flash).
+  useLayoutEffect(() => {
+    if (!active) return;
+    const el = containerRef.current;
+    const chart = chartRef.current;
+    if (!el || !chart) return;
+    const w = el.clientWidth, h = el.clientHeight;
+    if (w > 0 && h > 0) {
+      chart.applyOptions({ width: w, height: h });
+      chart.timeScale().fitContent();
+    }
+  }, [active, ticker, period]);
 
   return <div ref={containerRef} className="w-full h-full" />;
 }

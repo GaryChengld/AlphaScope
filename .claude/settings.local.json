@@ -54,7 +54,14 @@
       "Bash(git stash *)",
       "Bash(git merge *)",
       "Bash(echo \"Server: $?\")",
-      "Bash(echo \"Client: $?\")"
+      "Bash(echo \"Client: $?\")",
+      "PowerShell(Get-CimInstance *)",
+      "Bash(git push *)",
+      "mcp__plugin_playwright_playwright__browser_click",
+      "mcp__plugin_playwright_playwright__browser_evaluate",
+      "Bash(kill 31164)",
+      "Bash(pkill -f \"tsx src/index.ts\")",
+      "Bash(pkill -f \"vite\")"
     ]
   }
 }
