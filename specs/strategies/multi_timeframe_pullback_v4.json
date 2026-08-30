@@ -1,0 +1,447 @@
+{
+  "id": "multi_timeframe_pullback",
+  "name": "Multi-Timeframe Pullback Swing Trading",
+  "version": "4.0",
+
+  "requires": {
+    "timeframes": {
+      "1D": { "ema": [20, 50, 200], "atr": [14], "rsi": [14] },
+      "1W": { "ema": [50] },
+      "1H": { "ema": [9, 21] }
+    },
+    "spy": { "ema": [50] }
+  },
+
+  "mandatory": [
+    {
+      "rule": "priceAboveEma",
+      "params": { "period": 200, "timeframe": "1D" },
+      "label": "Price above daily EMA 200"
+    },
+    {
+      "rule": "emaAlignment",
+      "params": { "periods": [20, 50, 200], "timeframe": "1D" },
+      "label": "Daily EMA 20 > EMA 50 > EMA 200"
+    },
+    {
+      "rule": "priceAboveEma",
+      "params": { "period": 50, "timeframe": "1W" },
+      "label": "Weekly close above EMA 50"
+    },
+    {
+      "rule": "validPullback",
+      "params": { "timeframe": "1D", "atrPeriod": 14, "lookback": 20, "minAtr": 1.0, "maxAtr": 4.0 },
+      "label": "Valid pullback 1.0–4.0× ATR from 20-bar high"
+    },
+    {
+      "rule": "nearSwingLow",
+      "params": { "timeframe": "1D", "atrPeriod": 14, "lookback": 20, "atrMultiplier": 2.0 },
+      "label": "No significant bounce after pullback low (< 2.0× ATR)"
+    },
+    {
+      "rule": "pullbackToSupport",
+      "params": { "timeframe": "1D", "emaPeriods": [20, 50], "atrPeriod": 14, "atrThreshold": 1.0 },
+      "label": "Pullback within 1.0× ATR of EMA 20 or EMA 50"
+    },
+    {
+      "rule": "spyAboveEma",
+      "params": { "period": 50 },
+      "label": "SPY above its 50-day EMA"
+    },
+    {
+      "rule": "noNearEarnings",
+      "params": { "tradingDays": 5 },
+      "label": "No earnings within 5 trading days"
+    }
+  ],
+
+  "sections": [
+    {
+      "name": "Trend Strength",
+      "maxPoints": 20,
+      "groups": [
+        {
+          "label": "EMA Slope Quality (daily 20/50/200)",
+          "pick": "tiered",
+          "conditions": [
+            {
+              "rule": "emaAlignmentSlope",
+              "params": { "periods": [20, 50, 200], "timeframe": "1D", "quality": "all_sloping" },
+              "points": 8,
+              "label": "All three EMAs (20/50/200) sloping upward"
+            },
+            {
+              "rule": "emaAlignmentSlope",
+              "params": { "periods": [20, 50, 200], "timeframe": "1D", "quality": "ema200_flat" },
+              "points": 5,
+              "label": "EMA 20 & 50 up, EMA 200 flat"
+            },
+            {
+              "rule": "emaAlignmentSlope",
+              "params": { "periods": [20, 50, 200], "timeframe": "1D", "quality": "ema50_flat" },
+              "points": 2,
+              "label": "EMA 20 up, EMA 50 flat"
+            }
+          ]
+        },
+        {
+          "label": "Weekly Trend Health (last 12 weeks above EMA 50)",
+          "pick": "tiered",
+          "conditions": [
+            {
+              "rule": "weeklyAboveEmaCount",
+              "params": { "timeframe": "1W", "emaPeriod": 50, "lookback": 12, "minCount": 10 },
+              "points": 6,
+              "label": "≥10 of last 12 weekly closes above Weekly EMA 50"
+            },
+            {
+              "rule": "weeklyAboveEmaCount",
+              "params": { "timeframe": "1W", "emaPeriod": 50, "lookback": 12, "minCount": 7, "maxCount": 10 },
+              "points": 4,
+              "label": "7–9 of last 12 weekly closes above Weekly EMA 50"
+            },
+            {
+              "rule": "weeklyAboveEmaCount",
+              "params": { "timeframe": "1W", "emaPeriod": 50, "lookback": 12, "minCount": 5, "maxCount": 7 },
+              "points": 2,
+              "label": "5–6 of last 12 weekly closes above Weekly EMA 50"
+            }
+          ]
+        },
+        {
+          "label": "Relative Strength vs SPY (63-day return ratio)",
+          "pick": "tiered",
+          "conditions": [
+            {
+              "rule": "rsVsSpy",
+              "params": { "timeframe": "1D", "lookback": 63, "minRatio": 1.1 },
+              "points": 6,
+              "label": "RS ratio > 1.10 (outperforming SPY)"
+            },
+            {
+              "rule": "rsVsSpy",
+              "params": { "timeframe": "1D", "lookback": 63, "minRatio": 1.0, "maxRatio": 1.1 },
+              "points": 3,
+              "label": "RS ratio 1.00–1.10 (slight outperformance)"
+            },
+            {
+              "rule": "rsVsSpy",
+              "params": { "timeframe": "1D", "lookback": 63, "minRatio": 0.95, "maxRatio": 1.0 },
+              "points": 1,
+              "label": "RS ratio 0.95–1.00 (near parity with SPY)"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Pullback Quality",
+      "maxPoints": 25,
+      "groups": [
+        {
+          "label": "Pullback Depth — best of Fib or ATR",
+          "pick": "best_trigger",
+          "conditions": [
+            {
+              "rule": "fibRetracement",
+              "params": { "timeframe": "1D", "lookback": 20, "min": 38.2, "max": 50.0 },
+              "points": 12,
+              "label": "Fib 38.2–50% retracement (ideal golden zone)"
+            },
+            {
+              "rule": "pullbackAtrDepth",
+              "params": { "timeframe": "1D", "atrPeriod": 14, "lookback": 20, "min": 1.5, "max": 2.5 },
+              "points": 12,
+              "label": "ATR 1.5–2.5× from recent high (ideal range)"
+            },
+            {
+              "rule": "fibRetracement",
+              "params": { "timeframe": "1D", "lookback": 20, "min": 50.0, "max": 61.8 },
+              "points": 8,
+              "label": "Fib 50–61.8% retracement (deeper but valid)"
+            },
+            {
+              "rule": "pullbackAtrDepth",
+              "params": { "timeframe": "1D", "atrPeriod": 14, "lookback": 20, "min": 2.5, "max": 3.0 },
+              "points": 8,
+              "label": "ATR 2.5–3.0× from recent high (deeper)"
+            },
+            {
+              "rule": "fibRetracement",
+              "params": { "timeframe": "1D", "lookback": 20, "min": 23.6, "max": 38.2 },
+              "points": 6,
+              "label": "Fib 23.6–38.2% retracement (shallow)"
+            },
+            {
+              "rule": "pullbackAtrDepth",
+              "params": { "timeframe": "1D", "atrPeriod": 14, "lookback": 20, "min": 1.0, "max": 1.5 },
+              "points": 6,
+              "label": "ATR 1.0–1.5× from recent high (shallow)"
+            }
+          ]
+        },
+        {
+          "label": "Volume During Pullback (last 5 bars vs 20-day avg)",
+          "pick": "tiered",
+          "conditions": [
+            {
+              "rule": "pullbackVolume",
+              "params": { "timeframe": "1D", "avgWindow": 20, "pullbackWindow": 5, "quality": "ideal" },
+              "points": 8,
+              "label": "Declining volume, final day < 80% of 20-day avg"
+            },
+            {
+              "rule": "pullbackVolume",
+              "params": { "timeframe": "1D", "avgWindow": 20, "pullbackWindow": 5, "quality": "below_avg" },
+              "points": 5,
+              "label": "Below 20-day avg, not consistently declining"
+            },
+            {
+              "rule": "pullbackVolume",
+              "params": { "timeframe": "1D", "avgWindow": 20, "pullbackWindow": 5, "quality": "flat" },
+              "points": 2,
+              "label": "Roughly at 20-day average"
+            }
+          ]
+        },
+        {
+          "label": "Pullback Duration (days since 20-bar high)",
+          "pick": "tiered",
+          "conditions": [
+            {
+              "rule": "pullbackDuration",
+              "params": { "timeframe": "1D", "lookback": 20, "minDays": 3, "maxDays": 8 },
+              "points": 5,
+              "label": "3–8 trading days (healthy consolidation)"
+            },
+            {
+              "rule": "pullbackDuration",
+              "params": { "timeframe": "1D", "lookback": 20, "minDays": 9, "maxDays": 15 },
+              "points": 3,
+              "label": "9–15 trading days (extended but holding support)"
+            },
+            {
+              "rule": "pullbackDuration",
+              "params": { "timeframe": "1D", "lookback": 20, "minDays": 1, "maxDays": 2 },
+              "points": 1,
+              "label": "1–2 trading days (very fresh — may not be complete)"
+            },
+            {
+              "rule": "pullbackDuration",
+              "params": { "timeframe": "1D", "lookback": 20, "minDays": 16, "maxDays": 20 },
+              "points": 1,
+              "label": "16–20 trading days (extended — watch for base failure)"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Support Confluence",
+      "maxPoints": 15,
+      "groups": [
+        {
+          "label": "Confluence Count (factors within 0.5× ATR: EMA 20, EMA 50, prior swing high, round number)",
+          "pick": "tiered",
+          "conditions": [
+            {
+              "rule": "supportConfluence",
+              "params": { "timeframe": "1D", "emaPeriods": [20, 50], "atrPeriod": 14, "lookback": 20, "minFactors": 3 },
+              "points": 15,
+              "label": "3+ support factors converging"
+            },
+            {
+              "rule": "supportConfluence",
+              "params": { "timeframe": "1D", "emaPeriods": [20, 50], "atrPeriod": 14, "lookback": 20, "minFactors": 2 },
+              "points": 10,
+              "label": "2 support factors converging"
+            },
+            {
+              "rule": "supportConfluence",
+              "params": { "timeframe": "1D", "emaPeriods": [20, 50], "atrPeriod": 14, "lookback": 20, "minFactors": 1 },
+              "points": 5,
+              "label": "1 support factor only"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "RSI & Momentum",
+      "maxPoints": 10,
+      "groups": [
+        {
+          "label": "RSI(14) Reading (daily)",
+          "pick": "tiered",
+          "conditions": [
+            {
+              "rule": "rsiLevel",
+              "params": { "period": 14, "timeframe": "1D", "min": 40, "max": 50 },
+              "points": 6,
+              "label": "RSI 40–50 (ideal pullback zone)"
+            },
+            {
+              "rule": "rsiLevel",
+              "params": { "period": 14, "timeframe": "1D", "min": 50, "max": 55 },
+              "points": 4,
+              "label": "RSI 50–55 (mild pullback)"
+            },
+            {
+              "rule": "rsiLevel",
+              "params": { "period": 14, "timeframe": "1D", "min": 35, "max": 40 },
+              "points": 2,
+              "label": "RSI 35–40 (deeper — watch carefully)"
+            }
+          ]
+        },
+        {
+          "label": "RSI Behavior",
+          "pick": "tiered",
+          "conditions": [
+            {
+              "rule": "rsiStructure",
+              "params": { "period": 14, "timeframe": "1D", "type": "turning_up" },
+              "points": 4,
+              "label": "RSI turning upward from its low"
+            },
+            {
+              "rule": "rsiLevel",
+              "params": { "period": 14, "timeframe": "1D", "min": 40, "max": 100 },
+              "points": 2,
+              "label": "RSI flat but holding above 40"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "1-Hour Trigger Signal",
+      "maxPoints": 25,
+      "cap": 25,
+      "note": "Score scaled by min(1, upstream_score / 35). Triggers are detected over a recent 3-bar hourly window (a periodic scanner won't catch the exact trigger bar), and two graduated fallback tiers reward existing intraday alignment so the section is not all-or-nothing. Time-of-day check excluded — optimal session is a manual discretionary filter only.",
+      "dependsOn": { "sections": [1, 2, 3, 4], "multiplier": { "divisor": 35 } },
+      "groups": [
+        {
+          "label": "Trigger Type (best one wins)",
+          "pick": "best_trigger",
+          "conditions": [
+            {
+              "rule": "hourlyStructureBreak",
+              "params": { "timeframe": "1H", "lookback": 6, "withinBars": 3 },
+              "points": 15,
+              "label": "1H structure break in last 3 bars — close broke and holds above prior 6-bar swing high"
+            },
+            {
+              "rule": "bullishReversalCandle",
+              "params": { "timeframe": "1H", "pattern": "any", "withinBars": 3 },
+              "points": 12,
+              "label": "Bullish engulfing / hammer / pin bar on 1H in last 3 bars"
+            },
+            {
+              "rule": "hourlyEmaCrossover",
+              "params": { "timeframe": "1H", "fast": 9, "slow": 21, "withinBars": 3 },
+              "points": 9,
+              "label": "EMA 9 crossed above EMA 21 on 1H in last 3 bars"
+            },
+            {
+              "rule": "emaAlignment",
+              "params": { "timeframe": "1H", "periods": [9, 21] },
+              "points": 6,
+              "label": "1H short-term trend already up — EMA 9 > EMA 21"
+            },
+            {
+              "rule": "priceAboveEma",
+              "params": { "timeframe": "1H", "period": 9 },
+              "points": 4,
+              "label": "1H price reclaimed short-term MA — close > 1H EMA 9"
+            }
+          ]
+        },
+        {
+          "label": "Trigger Volume (vs 20-bar 1H avg)",
+          "pick": "tiered",
+          "conditions": [
+            {
+              "rule": "triggerVolume",
+              "params": { "timeframe": "1H", "avgWindow": 20, "minPctAboveAvg": 50 },
+              "points": 6,
+              "label": "50%+ above 1H average"
+            },
+            {
+              "rule": "triggerVolume",
+              "params": { "timeframe": "1H", "avgWindow": 20, "minPctAboveAvg": 20, "maxPctAboveAvg": 50 },
+              "points": 4,
+              "label": "20–50% above 1H average"
+            },
+            {
+              "rule": "triggerVolume",
+              "params": { "timeframe": "1H", "avgWindow": 20, "minPctAboveAvg": -30 },
+              "points": 2,
+              "label": "At or near 1H average"
+            }
+          ]
+        },
+        {
+          "label": "Trigger Timing (days since daily pullback signal)",
+          "pick": "tiered",
+          "conditions": [
+            {
+              "rule": "triggerTiming",
+              "params": { "dailyTimeframe": "1D", "atrPeriod": 14, "emaPeriods": [20, 50], "minDaysAfterSignal": 1, "maxDaysAfterSignal": 3 },
+              "points": 4,
+              "label": "Within 1–3 trading days of daily pullback signal"
+            },
+            {
+              "rule": "triggerTiming",
+              "params": { "dailyTimeframe": "1D", "atrPeriod": 14, "emaPeriods": [20, 50], "minDaysAfterSignal": 4, "maxDaysAfterSignal": 6 },
+              "points": 2,
+              "label": "Within 4–6 trading days of daily pullback signal"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Sector & Market Context",
+      "maxPoints": 5,
+      "groups": [
+        {
+          "label": "Sector ETF Strength (30-day return rank vs 11 sectors)",
+          "pick": "tiered",
+          "conditions": [
+            {
+              "rule": "sectorStrength",
+              "params": { "topN": 3 },
+              "points": 3,
+              "label": "Sector ETF in top 3 performing sectors"
+            },
+            {
+              "rule": "sectorStrength",
+              "params": { "topN": 7 },
+              "points": 1,
+              "label": "Sector ETF in top 7 sectors"
+            }
+          ]
+        },
+        {
+          "label": "Volatility Regime",
+          "pick": "tiered",
+          "conditions": [
+            {
+              "rule": "marketRegime",
+              "params": { "spyEmaPeriod": 50, "maxVix": 20 },
+              "points": 2,
+              "label": "VIX < 20 (low volatility regime)"
+            },
+            {
+              "rule": "marketRegime",
+              "params": { "spyEmaPeriod": 50, "maxVix": 30 },
+              "points": 1,
+              "label": "VIX 20–30 (elevated volatility)"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

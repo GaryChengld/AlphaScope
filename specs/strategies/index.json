@@ -18,6 +18,13 @@
     "name":    "Multi-Timeframe Pullback Swing Trading",
     "version": "3.0",
     "file":    "multi_timeframe_pullback_v3.json",
+    "enabled": false
+  },
+  {
+    "id":      "multi_timeframe_pullback",
+    "name":    "Multi-Timeframe Pullback Swing Trading",
+    "version": "4.0",
+    "file":    "multi_timeframe_pullback_v4.json",
     "enabled": true
   },
   {
@@ -39,6 +46,13 @@
     "name":    "ABC Pullback Continuation",
     "version": "1.0",
     "file":    "abc_pullback_continuation_v1.json",
+    "enabled": false
+  },
+  {
+    "id":      "abc_pullback_continuation",
+    "name":    "ABC Pullback Continuation",
+    "version": "2.0",
+    "file":    "abc_pullback_continuation_v2.json",
     "enabled": true
   },
   {
@@ -46,6 +60,13 @@
     "name":    "First Pullback to 50-Day",
     "version": "1.0",
     "file":    "first_pullback_50day_v1.json",
+    "enabled": false
+  },
+  {
+    "id":      "first_pullback_50day",
+    "name":    "First Pullback to 50-Day",
+    "version": "2.0",
+    "file":    "first_pullback_50day_v2.json",
     "enabled": true
   }
 ]

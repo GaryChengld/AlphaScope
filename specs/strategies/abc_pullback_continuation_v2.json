@@ -1,0 +1,216 @@
+{
+  "id": "abc_pullback_continuation",
+  "name": "ABC Pullback Continuation",
+  "version": "2.0",
+  "totalMaxPoints": 100,
+
+  "requires": {
+    "timeframes": {
+      "1D": { "ema": [20, 50], "atr": [14], "rsi": [14] },
+      "4H": { "ema": [9, 21, 50] },
+      "1H": { "ema": [9, 21] }
+    },
+    "spy": { "ema": [50] }
+  },
+
+  "mandatory": [
+    { "rule": "priceAboveEma",   "params": { "timeframe": "1D", "period": 50 },                                                                                             "label": "Uptrend — close above EMA50" },
+    { "rule": "emaAlignment",    "params": { "timeframe": "1D", "periods": [20, 50] },                                                                                      "label": "Uptrend — EMA20 above EMA50" },
+    { "rule": "abcHHHL",         "params": { "timeframe": "1D", "lookback": 20, "minHH": 2, "minHL": 2 },                                                                   "label": "Higher highs ≥ 2 and higher lows ≥ 2 in last 20 bars" },
+    { "rule": "abcImpulse",      "params": { "timeframe": "1D", "atrPeriod": 14, "lookback": 20, "minAtrSize": 1.5, "minBullishRatio": 0.6, "maxConsecBearish": 3, "maxOverextAtr": 2 }, "label": "A→B impulse ≥ 1.5× ATR, ≥ 60% bullish candles, B above prior 20-bar high" },
+    { "rule": "pullbackAtrDepth","params": { "timeframe": "1D", "atrPeriod": 14, "lookback": 20, "min": 0.5, "max": 4 },                                                    "label": "Pullback B→C depth 0.5–4× ATR(14)" },
+    { "rule": "abcFibRetracement", "params": { "timeframe": "1D", "lookback": 20, "min": 23.6, "max": 78.6 },                                                               "label": "Fib retracement of A→B between 23.6% and 78.6% (B=most recent close pivot, A=lowest low before B)" },
+    { "rule": "abcStructure",    "params": { "timeframe": "1D", "lookback": 20, "atrPeriod": 14, "checkField": "close" },                                                   "label": "Structure intact — close above most recent swing low (HL)" },
+    { "rule": "abcNearSupport",  "params": { "timeframe": "1D", "emaPeriods": [20, 50], "fibLevels": [0.382, 0.5, 0.618], "atrMultiple": 1.5, "atrPeriod": 14, "lookback": 20 }, "label": "Near support — within 1.5× ATR of EMA20, EMA50, or key fib level" },
+    { "rule": "abcNoDivergence", "params": { "timeframe": "1D", "rsiPeriod": 14, "maxRsi": 70, "lookback": 10 },                                                            "label": "RSI(14) < 70 and no bearish RSI divergence" }
+  ],
+
+  "sections": [
+    {
+      "name": "Trend Structure",
+      "maxPoints": 25,
+      "groups": [
+        {
+          "label": "HH / HL Count (last 20 bars)",
+          "pick": "tiered",
+          "conditions": [
+            { "rule": "abcHHHL", "params": { "timeframe": "1D", "lookback": 20, "minHH": 3, "minHL": 3 }, "points": 10, "label": "3+ HH and 3+ HL (strong sequence)" },
+            { "rule": "abcHHHL", "params": { "timeframe": "1D", "lookback": 20, "minHH": 2, "minHL": 0 }, "points": 7,  "label": "2+ HH (acceptable)" },
+            { "rule": "abcHHHL", "params": { "timeframe": "1D", "lookback": 20, "minHH": 1, "minHL": 0 }, "points": 4,  "label": "At least 1 HH (weak)" }
+          ]
+        },
+        {
+          "label": "A→B Bullish Candle Ratio",
+          "pick": "tiered",
+          "conditions": [
+            { "rule": "abcImpulseQuality", "params": { "timeframe": "1D", "lookback": 20, "minBullishRatio": 0.7 }, "points": 8, "label": "≥ 70% bullish candles (strong impulse)" },
+            { "rule": "abcImpulseQuality", "params": { "timeframe": "1D", "lookback": 20, "minBullishRatio": 0.6 }, "points": 5, "label": "≥ 60% bullish candles (acceptable)" },
+            { "rule": "abcImpulseQuality", "params": { "timeframe": "1D", "lookback": 20, "minBullishRatio": 0.0 }, "points": 2, "label": "< 60% bullish candles (weak impulse)" }
+          ]
+        },
+        {
+          "label": "EMA Alignment",
+          "pick": "tiered",
+          "conditions": [
+            { "rule": "emaAlignment", "params": { "timeframe": "4H", "periods": [9, 21, 50] }, "points": 7, "label": "Daily + 4H aligned (EMA9 > EMA21 > EMA50 on 4H)" },
+            { "rule": "emaAlignment", "params": { "timeframe": "1D", "periods": [20, 50] },    "points": 4, "label": "Daily only aligned (EMA20 > EMA50)" }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Pullback Quality",
+      "maxPoints": 25,
+      "groups": [
+        {
+          "label": "Fib Retracement of A→B",
+          "pick": "tiered",
+          "conditions": [
+            { "rule": "abcFibRetracement", "params": { "timeframe": "1D", "lookback": 20, "min": 38.2, "max": 50.0 }, "points": 10, "label": "38.2–50% retrace (ideal zone)" },
+            { "rule": "abcFibRetracement", "params": { "timeframe": "1D", "lookback": 20, "min": 50.0, "max": 61.8 }, "points": 7,  "label": "50–61.8% retrace (acceptable)" },
+            { "rule": "abcFibRetracement", "params": { "timeframe": "1D", "lookback": 20, "min": 23.6, "max": 38.2 }, "points": 5,  "label": "23.6–38.2% retrace (shallow)" },
+            { "rule": "abcFibRetracement", "params": { "timeframe": "1D", "lookback": 20, "min": 23.6, "max": 78.6 }, "points": 2,  "label": "Outside ideal zones but within range" }
+          ]
+        },
+        {
+          "label": "Pullback Body Size vs Impulse",
+          "pick": "tiered",
+          "conditions": [
+            { "rule": "abcPullbackBodyRatio", "params": { "timeframe": "1D", "lookback": 20, "max": 0.5 }, "points": 7, "label": "Pullback avg body ≤ 50% of impulse (small, orderly)" },
+            { "rule": "abcPullbackBodyRatio", "params": { "timeframe": "1D", "lookback": 20, "max": 0.8 }, "points": 4, "label": "Pullback avg body ≤ 80% of impulse" },
+            { "rule": "abcPullbackBodyRatio", "params": { "timeframe": "1D", "lookback": 20, "max": 9.9 }, "points": 1, "label": "Large pullback bodies relative to impulse" }
+          ]
+        },
+        {
+          "label": "Volume on Pullback",
+          "pick": "tiered",
+          "conditions": [
+            { "rule": "pullbackVolume", "params": { "timeframe": "1D", "avgWindow": 20, "pullbackWindow": 5, "quality": "ideal"     }, "points": 5, "label": "Volume progressively declining and below 80% avg (ideal)" },
+            { "rule": "pullbackVolume", "params": { "timeframe": "1D", "avgWindow": 20, "pullbackWindow": 5, "quality": "below_avg" }, "points": 3, "label": "Volume below avg (healthy)" },
+            { "rule": "pullbackVolume", "params": { "timeframe": "1D", "avgWindow": 20, "pullbackWindow": 5, "quality": "flat"      }, "points": 1, "label": "Volume flat around avg" }
+          ]
+        },
+        {
+          "label": "Pullback Duration",
+          "pick": "tiered",
+          "conditions": [
+            { "rule": "pullbackDuration", "params": { "timeframe": "1D", "lookback": 20, "minDays": 3,  "maxDays": 10 }, "points": 3, "label": "3–10 bars (timely pullback)" },
+            { "rule": "pullbackDuration", "params": { "timeframe": "1D", "lookback": 20, "minDays": 1,  "maxDays": 20 }, "points": 2, "label": "1–20 bars (acceptable)" },
+            { "rule": "pullbackDuration", "params": { "timeframe": "1D", "lookback": 20, "minDays": 1             }, "points": 1, "label": "Any duration present" }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "C-Point Quality",
+      "maxPoints": 20,
+      "groups": [
+        {
+          "label": "Support Confluence at C",
+          "pick": "tiered",
+          "conditions": [
+            { "rule": "supportConfluence", "params": { "timeframe": "1D", "emaPeriods": [20, 50], "atrPeriod": 14, "lookback": 20, "minFactors": 3 }, "points": 10, "label": "3+ factors confluent (EMA, Fib, polarity, round number)" },
+            { "rule": "supportConfluence", "params": { "timeframe": "1D", "emaPeriods": [20, 50], "atrPeriod": 14, "lookback": 20, "minFactors": 2 }, "points": 7,  "label": "2 factors confluent" },
+            { "rule": "supportConfluence", "params": { "timeframe": "1D", "emaPeriods": [20, 50], "atrPeriod": 14, "lookback": 20, "minFactors": 1 }, "points": 3,  "label": "1 factor at C (minimal support)" }
+          ]
+        },
+        {
+          "label": "C-Point Candle Lower Wick",
+          "pick": "tiered",
+          "conditions": [
+            { "rule": "abcCPointWick", "params": { "timeframe": "1D", "minWickRatio": 2, "minClosePos": 0.67 }, "points": 6, "label": "Lower wick ≥ 2× body AND close in top 67% of bar (bullish rejection)" },
+            { "rule": "abcCPointWick", "params": { "timeframe": "1D", "minWickRatio": 1, "minClosePos": 0    }, "points": 3, "label": "Lower wick ≥ 1× body" }
+          ]
+        },
+        {
+          "label": "Structure at C",
+          "pick": "tiered",
+          "conditions": [
+            { "rule": "abcStructure", "params": { "timeframe": "1D", "lookback": 20, "atrPeriod": 14, "checkField": "low"      }, "points": 4, "label": "Bar low above HL swing low (structure clean)" },
+            { "rule": "abcStructure", "params": { "timeframe": "1D", "lookback": 20, "atrPeriod": 14, "checkField": "low_near", "maxAtrFraction": 0.3 }, "points": 2, "label": "Bar low within 0.3× ATR of HL (marginal)" }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Momentum",
+      "maxPoints": 10,
+      "groups": [
+        {
+          "label": "Price Momentum",
+          "pick": "tiered",
+          "conditions": [
+            { "rule": "abcMomentum", "params": { "timeframe": "1D", "lookback": 10, "check": "above_lower_high" }, "points": 5, "label": "Close above last lower high (micro-breakout)" },
+            { "rule": "abcMomentum", "params": { "timeframe": "1D", "lookback": 10, "check": "top_third"        }, "points": 3, "label": "2 consecutive closes in top 33% of range" }
+          ]
+        },
+        {
+          "label": "RSI Momentum",
+          "pick": "tiered",
+          "conditions": [
+            { "rule": "rsiStructure", "params": { "timeframe": "1D", "period": 14, "type": "turning_up" }, "points": 5, "label": "RSI(14) > 40 and turning up from 3 bars ago" },
+            { "rule": "rsiLevel",     "params": { "timeframe": "1D", "period": 14, "min": 50, "max": 55 }, "points": 3, "label": "RSI(14) in 50–55 range" },
+            { "rule": "rsiLevel",     "params": { "timeframe": "1D", "period": 14, "min": 35, "max": 70 }, "points": 1, "label": "RSI(14) in 35–70 (neutral)" }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Lower Timeframe Trigger",
+      "maxPoints": 15,
+      "note": "Only scores when sections 1–4 total ≥ 40. Triggers are detected over a recent 3-bar hourly window (a periodic scanner won't catch the exact trigger bar), and two graduated fallback tiers reward existing intraday alignment so the Trigger Type group is not all-or-nothing.",
+      "dependsOn": { "sections": [1, 2, 3, 4], "minTotal": 40 },
+      "groups": [
+        {
+          "label": "1H Trigger Type",
+          "pick": "tiered",
+          "conditions": [
+            { "rule": "hourlyStructureBreak",  "params": { "timeframe": "1H", "lookback": 20, "withinBars": 3 },              "points": 8, "label": "1H structure break in last 3 bars — close broke and holds above prior 20-bar 1H swing high" },
+            { "rule": "bullishReversalCandle",  "params": { "timeframe": "1H", "pattern": "any", "withinBars": 3 },           "points": 6, "label": "1H bullish reversal candle in last 3 bars (hammer / engulfing / green-after-red)" },
+            { "rule": "hourlyEmaCrossover",     "params": { "timeframe": "1H", "fast": 9, "slow": 21, "withinBars": 3 },      "points": 5, "label": "1H EMA9 crosses above EMA21 in last 3 bars" },
+            { "rule": "emaAlignment",           "params": { "timeframe": "1H", "periods": [9, 21] },                         "points": 3, "label": "1H short-term trend already up — EMA9 > EMA21" },
+            { "rule": "priceAboveEma",          "params": { "timeframe": "1H", "period": 9 },                                "points": 2, "label": "1H price reclaimed short-term MA — close > 1H EMA9" }
+          ]
+        },
+        {
+          "label": "1H Trigger Volume",
+          "pick": "tiered",
+          "conditions": [
+            { "rule": "triggerVolume", "params": { "timeframe": "1H", "avgWindow": 20, "minPctAboveAvg": 50 },                       "points": 4, "label": "> 1.5× avg 1H volume" },
+            { "rule": "triggerVolume", "params": { "timeframe": "1H", "avgWindow": 20, "minPctAboveAvg": 20 },                       "points": 2, "label": "> 1.2× avg 1H volume" },
+            { "rule": "triggerVolume", "params": { "timeframe": "1H", "avgWindow": 20, "minPctAboveAvg": 0  },                       "points": 1, "label": "Above avg 1H volume" }
+          ]
+        },
+        {
+          "label": "Recency of C-Point",
+          "pick": "tiered",
+          "conditions": [
+            { "rule": "abcDaysSinceC", "params": { "timeframe": "1D", "lookback": 20, "max": 3 }, "points": 3, "label": "C-point within last 3 bars (fresh setup)" },
+            { "rule": "abcDaysSinceC", "params": { "timeframe": "1D", "lookback": 20, "max": 20 }, "points": 1, "label": "C-point older than 3 bars" }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Market Context",
+      "maxPoints": 5,
+      "groups": [
+        {
+          "label": "SPY Trend and VIX",
+          "pick": "tiered",
+          "conditions": [
+            { "rule": "marketRegime", "params": { "maxVix": 20, "spyEmaPeriod": 50 }, "points": 3, "label": "SPY above EMA50 AND VIX < 20 (bullish regime)" },
+            { "rule": "spyAboveEma",  "params": { "period": 50 },                     "points": 1, "label": "SPY above EMA50 (trend ok, VIX elevated)" }
+          ]
+        },
+        {
+          "label": "No Earnings Risk",
+          "pick": "additive",
+          "conditions": [
+            { "rule": "noNearEarnings", "params": { "tradingDays": 5 }, "points": 2, "label": "No earnings within 5 trading days" }
+          ]
+        }
+      ]
+    }
+  ]
+}
