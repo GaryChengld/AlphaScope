@@ -5,10 +5,11 @@ import { last, paramNum, paramNumOpt, paramStr, paramArr } from './helpers';
 // ─── Rules ───────────────────────────────────────────────────────────────────
 
 export function hourlyEmaCrossover(ctx: StrategyContext, params: Record<string, unknown>): RuleResult {
-  const timeframe = paramStr(params, 'timeframe', '1H');
-  const fast      = paramNum(params, 'fast');
-  const slow      = paramNum(params, 'slow');
-  const tf        = ctx.timeframes[timeframe];
+  const timeframe  = paramStr(params, 'timeframe', '1H');
+  const fast       = paramNum(params, 'fast');
+  const slow       = paramNum(params, 'slow');
+  const withinBars = paramNum(params, 'withinBars', 3);
+  const tf         = ctx.timeframes[timeframe];
   if (!tf) return { pass: false, detail: `No ${timeframe} data` };
 
   const emaFast = tf.ema[fast];
@@ -16,8 +17,9 @@ export function hourlyEmaCrossover(ctx: StrategyContext, params: Record<string, 
   if (!emaFast?.length || !emaSlow?.length || emaFast.length < 4)
     return { pass: false, detail: `Insufficient ${timeframe} EMA${fast}/EMA${slow} data` };
 
+  // Look for a fast-over-slow cross within the last `withinBars` completed bars.
   let crossFound = false;
-  for (let i = emaFast.length - 1; i >= Math.max(1, emaFast.length - 3); i--) {
+  for (let i = emaFast.length - 1; i >= Math.max(1, emaFast.length - withinBars); i--) {
     if (emaFast[i - 1] <= emaSlow[i - 1] && emaFast[i] > emaSlow[i]) { crossFound = true; break; }
   }
 
@@ -25,42 +27,57 @@ export function hourlyEmaCrossover(ctx: StrategyContext, params: Record<string, 
   const slowNow = last(emaSlow)!;
   return {
     pass: crossFound,
-    detail: `${timeframe} EMA${fast} $${fastNow.toFixed(2)} vs EMA${slow} $${slowNow.toFixed(2)} — cross ${crossFound ? 'detected' : 'not detected'} in last 3 bars`,
+    detail: `${timeframe} EMA${fast} $${fastNow.toFixed(2)} vs EMA${slow} $${slowNow.toFixed(2)} — cross ${crossFound ? 'detected' : 'not detected'} in last ${withinBars} bars`,
   };
 }
 
 export function hourlyStructureBreak(ctx: StrategyContext, params: Record<string, unknown>): RuleResult {
-  const timeframe = paramStr(params, 'timeframe', '1H');
-  const lookback  = paramNum(params, 'lookback');
-  const tf        = ctx.timeframes[timeframe];
+  const timeframe  = paramStr(params, 'timeframe', '1H');
+  const lookback   = paramNum(params, 'lookback');
+  const withinBars = paramNum(params, 'withinBars', 1);
+  const tf         = ctx.timeframes[timeframe];
   if (!tf || tf.candles.length < lookback + 1)
     return { pass: false, detail: `Insufficient ${timeframe} data` };
 
   const candles   = tf.candles;
   const lastClose = last(candles)!.close;
-  const swingHigh = Math.max(...candles.slice(-lookback - 1, -1).map(c => c.high));
-  const pass      = lastClose > swingHigh;
+
+  // Consider the last `withinBars` bars as candidate break bars. A bar counts as
+  // a structure break if its close cleared the swing high of the `lookback` bars
+  // immediately before it — and the break is still valid only if the current
+  // close is still holding at/above that broken level. withinBars=1 reduces to
+  // "the last bar just broke a new high".
+  let pass = false;
+  let brokenLevel = NaN;
+  for (let k = 0; k < withinBars; k++) {
+    const idx = candles.length - 1 - k;
+    if (idx - lookback < 0) break;
+    const swingHigh = Math.max(...candles.slice(idx - lookback, idx).map(c => c.high));
+    if (candles[idx].close > swingHigh && lastClose >= swingHigh) {
+      pass = true;
+      brokenLevel = swingHigh;
+      break;
+    }
+  }
+
+  const detailLevel = Number.isNaN(brokenLevel)
+    ? Math.max(...candles.slice(-lookback - 1, -1).map(c => c.high))
+    : brokenLevel;
   return {
     pass,
-    detail: `${timeframe} close $${lastClose.toFixed(2)} vs ${lookback}-bar swing high $${swingHigh.toFixed(2)}`,
+    detail: `${timeframe} close $${lastClose.toFixed(2)} vs ${lookback}-bar swing high $${detailLevel.toFixed(2)} — break ${pass ? 'confirmed' : 'not found'} in last ${withinBars} bar(s)`,
   };
 }
 
 type ReversalPattern = 'any' | 'engulfing_2plus' | 'hammer' | 'pin_doji' | 'green_after_red';
 
-// Detects bullish reversal patterns on the most recent candle of the given timeframe.
-// When `pattern` is omitted or 'any', all four patterns are accepted (broadest gate).
-// Named patterns score individual types for tiered sections.
-export function bullishReversalCandle(ctx: StrategyContext, params: Record<string, unknown>): RuleResult {
-  const timeframe = paramStr(params, 'timeframe', '1H');
-  const pattern   = (params.pattern as ReversalPattern | undefined) ?? 'any';
-  const tf        = ctx.timeframes[timeframe];
-  if (!tf || tf.candles.length < 2)
-    return { pass: false, detail: `Insufficient ${timeframe} data` };
+interface CandleShape { open: number; high: number; low: number; close: number; }
 
-  const candles = tf.candles;
-  const curr    = candles[candles.length - 1];
-  const prev    = candles[candles.length - 2];
+// Evaluates the bullish reversal patterns for the candle at index `ci`, using
+// the bars before it to count the preceding red run.
+function evalReversalAt(candles: CandleShape[], ci: number, pattern: ReversalPattern) {
+  const curr = candles[ci];
+  const prev = candles[ci - 1];
 
   const body      = Math.abs(curr.close - curr.open);
   const lowerWick = Math.min(curr.open, curr.close) - curr.low;
@@ -71,9 +88,9 @@ export function bullishReversalCandle(ctx: StrategyContext, params: Record<strin
     curr.open  <= prev.close &&
     curr.close >= prev.open;
 
-  // Count consecutive red bars preceding the current bar
+  // Count consecutive red bars immediately preceding the candidate bar
   let redCount = 0;
-  for (let i = candles.length - 2; i >= 0; i--) {
+  for (let i = ci - 1; i >= 0; i--) {
     if (candles[i].close < candles[i].open) redCount++;
     else break;
   }
@@ -93,23 +110,50 @@ export function bullishReversalCandle(ctx: StrategyContext, params: Record<strin
   if (pattern === 'any') {
     pass = isBullishEngulfing || isHammer || isPinOrDoji || (curr.close > curr.open && redCount >= 2);
     detail = pass
-      ? `${timeframe} reversal: engulfing=${isBullishEngulfing} hammer=${isHammer} pin=${isPinOrDoji} redCount=${redCount}`
-      : `No reversal pattern on ${timeframe}`;
+      ? `reversal: engulfing=${isBullishEngulfing} hammer=${isHammer} pin=${isPinOrDoji} redCount=${redCount}`
+      : 'no reversal pattern';
   } else if (pattern === 'engulfing_2plus') {
     pass   = isEngulfing2Plus;
-    detail = `${timeframe} engulfing of ${redCount} red bar(s): O$${curr.open.toFixed(2)} C$${curr.close.toFixed(2)}`;
+    detail = `engulfing of ${redCount} red bar(s): O$${curr.open.toFixed(2)} C$${curr.close.toFixed(2)}`;
   } else if (pattern === 'hammer') {
     pass   = isHammer;
-    detail = `${timeframe} hammer: lower wick ${lowerWick.toFixed(2)} vs body ${body.toFixed(2)}`;
+    detail = `hammer: lower wick ${lowerWick.toFixed(2)} vs body ${body.toFixed(2)}`;
   } else if (pattern === 'pin_doji') {
     pass   = isPinOrDoji;
-    detail = `${timeframe} pin/doji: body ${body.toFixed(2)} vs range ${barRange.toFixed(2)}, lower wick ${lowerWick.toFixed(2)}`;
+    detail = `pin/doji: body ${body.toFixed(2)} vs range ${barRange.toFixed(2)}, lower wick ${lowerWick.toFixed(2)}`;
   } else if (pattern === 'green_after_red') {
     pass   = isGreenAfterRed;
-    detail = `${timeframe} green close after ${redCount} red bar(s)`;
+    detail = `green close after ${redCount} red bar(s)`;
   }
 
   return { pass, detail };
+}
+
+// Detects bullish reversal patterns on the given timeframe. Scans the last
+// `withinBars` candles (default 1 = most recent bar only) and passes if any of
+// them matches. When `pattern` is omitted or 'any', all four patterns are
+// accepted (broadest gate); named patterns score individual types.
+export function bullishReversalCandle(ctx: StrategyContext, params: Record<string, unknown>): RuleResult {
+  const timeframe  = paramStr(params, 'timeframe', '1H');
+  const pattern    = (params.pattern as ReversalPattern | undefined) ?? 'any';
+  const withinBars = paramNum(params, 'withinBars', 1);
+  const tf         = ctx.timeframes[timeframe];
+  if (!tf || tf.candles.length < 2)
+    return { pass: false, detail: `Insufficient ${timeframe} data` };
+
+  const candles = tf.candles;
+  // Need index >= 1 (a prev bar) for each candidate; cap the scan accordingly.
+  const oldest  = Math.max(1, candles.length - withinBars);
+
+  for (let ci = candles.length - 1; ci >= oldest; ci--) {
+    const r = evalReversalAt(candles, ci, pattern);
+    if (r.pass) {
+      const barsAgo = candles.length - 1 - ci;
+      return { pass: true, detail: `${timeframe} ${r.detail}${barsAgo > 0 ? ` (${barsAgo} bar(s) ago)` : ''}` };
+    }
+  }
+
+  return { pass: false, detail: `No reversal pattern on ${timeframe} in last ${withinBars} bar(s)` };
 }
 
 export function triggerVolume(ctx: StrategyContext, params: Record<string, unknown>): RuleResult {
@@ -122,15 +166,26 @@ export function triggerVolume(ctx: StrategyContext, params: Record<string, unkno
     return { pass: false, detail: `Insufficient ${timeframe} data` };
 
   const candles = tf.candles;
-  const lastVol = last(candles)!.volume;
-  const avgVol  = candles.slice(-avgWindow - 1, -1).reduce((s, c) => s + c.volume, 0) / avgWindow;
+  // The most recent bar can carry zero volume when evaluated off-hours (the
+  // current, not-yet-traded bar). Use the most recent bar that actually traded
+  // as the trigger bar, and average the `avgWindow` bars immediately before it,
+  // so off-hours evaluations aren't penalized. When the last bar has volume this
+  // is identical to averaging the prior window.
+  let triggerIdx = candles.length - 1;
+  while (triggerIdx >= 0 && candles[triggerIdx].volume <= 0) triggerIdx--;
+  if (triggerIdx < avgWindow)
+    return { pass: false, detail: `Insufficient ${timeframe} volume data` };
+
+  const lastVol = candles[triggerIdx].volume;
+  const avgVol  = candles.slice(triggerIdx - avgWindow, triggerIdx).reduce((s, c) => s + c.volume, 0) / avgWindow;
   if (avgVol === 0) return { pass: false, detail: 'Zero average volume' };
 
+  const skipped  = candles.length - 1 - triggerIdx;
   const pctAbove = (lastVol / avgVol - 1) * 100;
   const pass     = pctAbove >= minPctAboveAvg && (maxPctAboveAvg == null || pctAbove < maxPctAboveAvg);
   return {
     pass,
-    detail: `${timeframe} trigger bar volume ${pctAbove >= 0 ? '+' : ''}${pctAbove.toFixed(0)}% vs ${avgWindow}-bar avg`,
+    detail: `${timeframe} trigger bar volume ${pctAbove >= 0 ? '+' : ''}${pctAbove.toFixed(0)}% vs ${avgWindow}-bar avg${skipped > 0 ? ` (skipped ${skipped} zero-vol bar${skipped > 1 ? 's' : ''})` : ''}`,
   };
 }
 
@@ -138,6 +193,7 @@ export function triggerTiming(ctx: StrategyContext, params: Record<string, unkno
   const dailyTimeframe     = paramStr(params, 'dailyTimeframe', '1D');
   const atrPeriod          = paramNum(params, 'atrPeriod',      14);
   const emaPeriods         = paramArr(params, 'emaPeriods',     [20, 50]);
+  const minDaysAfterSignal = paramNum(params, 'minDaysAfterSignal', 1);
   const maxDaysAfterSignal = paramNum(params, 'maxDaysAfterSignal');
   const tf = ctx.timeframes[dailyTimeframe];
   if (!tf || tf.candles.length < 5)
@@ -162,11 +218,11 @@ export function triggerTiming(ctx: StrategyContext, params: Record<string, unkno
     else break;
   }
 
-  const pass = setupDays > 0 && setupDays <= maxDaysAfterSignal;
+  const pass = setupDays >= minDaysAfterSignal && setupDays <= maxDaysAfterSignal;
   const checked = emaPeriods.map(p => `EMA${p}`).join('/');
   return {
     pass,
-    detail: `${setupDays} completed ${dailyTimeframe} bar(s) within 1×ATR${atrPeriod} of ${checked}`,
+    detail: `${setupDays} completed ${dailyTimeframe} bar(s) within 1×ATR${atrPeriod} of ${checked} (window ${minDaysAfterSignal}–${maxDaysAfterSignal})`,
   };
 }
 
