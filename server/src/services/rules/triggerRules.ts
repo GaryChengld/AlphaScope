@@ -108,10 +108,15 @@ function evalReversalAt(candles: CandleShape[], ci: number, pattern: ReversalPat
   let detail = '';
 
   if (pattern === 'any') {
-    pass = isBullishEngulfing || isHammer || isPinOrDoji || (curr.close > curr.open && redCount >= 2);
-    detail = pass
-      ? `reversal: engulfing=${isBullishEngulfing} hammer=${isHammer} pin=${isPinOrDoji} redCount=${redCount}`
-      : 'no reversal pattern';
+    const greenAfterRed = curr.close > curr.open && redCount >= 2;
+    pass = isBullishEngulfing || isHammer || isPinOrDoji || greenAfterRed;
+    const kinds = [
+      isBullishEngulfing && 'engulfing',
+      isHammer && 'hammer',
+      isPinOrDoji && 'pin/doji',
+      greenAfterRed && `green-after-${redCount}-red`,
+    ].filter(Boolean).join(', ');
+    detail = pass ? `bullish reversal (${kinds})` : 'no reversal pattern';
   } else if (pattern === 'engulfing_2plus') {
     pass   = isEngulfing2Plus;
     detail = `engulfing of ${redCount} red bar(s): O$${curr.open.toFixed(2)} C$${curr.close.toFixed(2)}`;
@@ -166,26 +171,15 @@ export function triggerVolume(ctx: StrategyContext, params: Record<string, unkno
     return { pass: false, detail: `Insufficient ${timeframe} data` };
 
   const candles = tf.candles;
-  // The most recent bar can carry zero volume when evaluated off-hours (the
-  // current, not-yet-traded bar). Use the most recent bar that actually traded
-  // as the trigger bar, and average the `avgWindow` bars immediately before it,
-  // so off-hours evaluations aren't penalized. When the last bar has volume this
-  // is identical to averaging the prior window.
-  let triggerIdx = candles.length - 1;
-  while (triggerIdx >= 0 && candles[triggerIdx].volume <= 0) triggerIdx--;
-  if (triggerIdx < avgWindow)
-    return { pass: false, detail: `Insufficient ${timeframe} volume data` };
-
-  const lastVol = candles[triggerIdx].volume;
-  const avgVol  = candles.slice(triggerIdx - avgWindow, triggerIdx).reduce((s, c) => s + c.volume, 0) / avgWindow;
+  const lastVol = last(candles)!.volume;
+  const avgVol  = candles.slice(-avgWindow - 1, -1).reduce((s, c) => s + c.volume, 0) / avgWindow;
   if (avgVol === 0) return { pass: false, detail: 'Zero average volume' };
 
-  const skipped  = candles.length - 1 - triggerIdx;
   const pctAbove = (lastVol / avgVol - 1) * 100;
   const pass     = pctAbove >= minPctAboveAvg && (maxPctAboveAvg == null || pctAbove < maxPctAboveAvg);
   return {
     pass,
-    detail: `${timeframe} trigger bar volume ${pctAbove >= 0 ? '+' : ''}${pctAbove.toFixed(0)}% vs ${avgWindow}-bar avg${skipped > 0 ? ` (skipped ${skipped} zero-vol bar${skipped > 1 ? 's' : ''})` : ''}`,
+    detail: `${timeframe} trigger bar volume ${pctAbove >= 0 ? '+' : ''}${pctAbove.toFixed(0)}% vs ${avgWindow}-bar avg`,
   };
 }
 

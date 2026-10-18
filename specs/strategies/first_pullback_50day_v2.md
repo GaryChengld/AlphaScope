@@ -123,7 +123,7 @@ Evaluates whether the current daily bar is the **first pullback to the 50-day EM
 **Trigger Type** _(best one wins, Max 6)_
 
 - [ ] 1H structure break in last 3 bars — close broke and **holds** above the prior 6-bar swing high = **6**
-- [ ] Bullish engulfing / hammer / pin bar on 1H within the last 3 bars = **5**
+- [ ] Bullish reversal candle (engulfing / hammer / pin / green-after-red) on 1H within the last 3 bars = **5**
 - [ ] EMA 9 crossed above EMA 21 on 1H within the last 3 bars = **4**
 - [ ] _(fallback)_ 1H short-term trend already up — EMA 9 > EMA 21 = **3**
 - [ ] _(fallback)_ 1H price reclaimed short-term MA — close > 1H EMA 9 = **2**

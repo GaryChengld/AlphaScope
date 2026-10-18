@@ -335,7 +335,7 @@
               "rule": "bullishReversalCandle",
               "params": { "timeframe": "1H", "pattern": "any", "withinBars": 3 },
               "points": 12,
-              "label": "Bullish engulfing / hammer / pin bar on 1H in last 3 bars"
+              "label": "Bullish reversal candle (engulfing / hammer / pin / green-after-red) on 1H in last 3 bars"
             },
             {
               "rule": "hourlyEmaCrossover",

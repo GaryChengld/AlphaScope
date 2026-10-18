@@ -83,6 +83,30 @@ type QuoteSummaryFn = (
   reqOpts: { validateResult: boolean },
 ) => Promise<QuoteSummary>;
 
+// ── Regular-session filtering (intraday only) ────────────────────────────────
+// Intraday feeds include pre-/post-market bars (often thin or zero-volume) that
+// distort candle-shape, structure, EMA and volume signals — and that a trader
+// doesn't see on a regular-hours chart. Keep only bars whose NY start time falls
+// in the regular equity session (09:30–16:00 ET). DST handled via Intl.
+const NY_HM = new Intl.DateTimeFormat('en-US', {
+  timeZone: 'America/New_York', hour: '2-digit', minute: '2-digit', hour12: false,
+});
+const REG_OPEN_MIN  = 9 * 60 + 30; // 09:30 ET
+const REG_CLOSE_MIN = 16 * 60;     // 16:00 ET
+
+function isIntradayTimeframe(tf: string): boolean {
+  return tf.endsWith('H') || tf.endsWith('m');
+}
+
+function isRegularSessionBar(time: number | string): boolean {
+  if (typeof time !== 'number') return true; // daily/weekly (date strings) — never filtered
+  const parts = NY_HM.formatToParts(new Date(time * 1000));
+  const hh = Number(parts.find(p => p.type === 'hour')?.value ?? '0') % 24;
+  const mm = Number(parts.find(p => p.type === 'minute')?.value ?? '0');
+  const minOfDay = hh * 60 + mm;
+  return minOfDay >= REG_OPEN_MIN && minOfDay < REG_CLOSE_MIN;
+}
+
 function buildTimeframeData(
   candles: OhlcvRow[],
   reqs: IndicatorSpec,
@@ -232,10 +256,10 @@ export async function buildStrategyContext(
     const r = candleResults[i];
     if (r.status === 'rejected')
       console.warn(`[ctx] ${ticker} ${tf} candles failed:`, (r.reason as Error)?.message ?? r.reason);
-    timeframes[tf] = buildTimeframeData(
-      r.status === 'fulfilled' ? r.value : [],
-      requires.timeframes[tf],
-    );
+    let rows = r.status === 'fulfilled' ? r.value : [];
+    // Restrict intraday timeframes to regular trading hours (09:30–16:00 ET).
+    if (isIntradayTimeframe(tf)) rows = rows.filter(c => isRegularSessionBar(c.time));
+    timeframes[tf] = buildTimeframeData(rows, requires.timeframes[tf]);
   });
 
   const spyCandles: OhlcvRow[] = spyResult[0].status === 'fulfilled' ? spyResult[0].value : [];
